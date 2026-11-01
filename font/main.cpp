@@ -41,14 +41,16 @@ int main() {
 	for (char c = '!'; c <= '~'; ++c) {
 		offsets.emplace_back(index);
 
+        int size = 24;
+
 		int w, h, xoff, yoff;
 		const auto bitmap = stbtt_GetCodepointBitmap(
-				&font, 0, stbtt_ScaleForPixelHeight(&font, 32), c, &w, &h,
+				&font, 0, stbtt_ScaleForPixelHeight(&font, 24), c, &w, &h,
 				&xoff, &yoff);
 
 		int advance, lsb;
 		stbtt_GetCodepointHMetrics(&font, c, &advance, &lsb);
-		auto scale = stbtt_ScaleForPixelHeight(&font, 32);
+		auto scale = stbtt_ScaleForPixelHeight(&font, 24);
 
 		printf("0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X,\n    ", w, h,
 			   (uint8_t)xoff, (uint8_t)yoff, (int)lroundf(advance * scale),
