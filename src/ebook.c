@@ -25,26 +25,65 @@ int main() {
 
 	Delay_Ms(2000);
 
-	load_lut(REG_C, LUT_C);
-	load_lut(REG_KW, LUT_KW);
-	load_lut(REG_WK, LUT_WK);
+	load_lut(REG_KW, 0);
 
+	// Set OLD to full white
 	send(0x10);
 	set_dc(1);
 	for (int i = 0; i < 800 * 480 / 8; ++i) {
-		send(0x0F);
+		send(0xFF);
 	}
 	set_dc(0);
+
+	// Black
+	load_lut(REG_C, LUT_C_WK);
+	load_lut(REG_WK, LUT_WK);
 
 	send(0x13);
 	set_dc(1);
-	for (int i = 0; i < 800 * 480 / 8; ++i) {
-		send(0xF0);
+	for (int i = 0; i < HEIGHT * WIDTH / 8; ++i) {
+		if (i >= (HEIGHT * WIDTH / 8) / 4 * 3) {
+			send(0x00);
+		} else {
+			send(0xFF);
+		}
 	}
 	set_dc(0);
-
 	refresh();
 
+	// Dark gray
+	load_lut(REG_C, LUT_C_WDK);
+	load_lut(REG_WW, LUT_WW_WDK);
+	load_lut(REG_WK, LUT_WDK);
+
+	send(0x13);
+	set_dc(1);
+	for (int i = 0; i < HEIGHT * WIDTH / 8; ++i) {
+		if (i >= (HEIGHT * WIDTH / 8) / 4 * 2) {
+			send(0x00);
+		} else {
+			send(0xFF);
+		}
+	}
+	set_dc(0);
+	refresh();
+
+	// Light gray
+	send(0x13);
+	set_dc(1);
+	for (int i = 0; i < HEIGHT * WIDTH / 8; ++i) {
+		if (i >= (HEIGHT * WIDTH / 8) / 4 * 1) {
+			send(0x00);
+		} else {
+			send(0xFF);
+		}
+	}
+	set_dc(0);
+	refresh();
+
+	Delay_Ms(30000);
+
+	// End program
 	power_off();
 
 	while (1)

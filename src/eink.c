@@ -44,6 +44,7 @@ void init_eink(void) {
 	// Clear screen
 	send(0x10);
 	set_dc(1);
+	// OLD
 	for (int i = 0; i < 800 * 480 / 8; ++i) {
 		send(0x00);
 	}
@@ -57,6 +58,13 @@ void init_eink(void) {
 	set_dc(0);
 
 	refresh();
+
+    // Disable border
+	send(0x50);
+	set_dc(1);
+	send(0xA1);
+	send(0x03);
+	set_dc(0);
 }
 
 void refresh(void) {
@@ -119,7 +127,7 @@ void setup_lut(const uint8_t TR[]) {
 			num += 18;
 		}
 
-		for (int j = 0; j < 42; ++j) {
+		for (int j = 0; j < num; ++j) {
 			send(0);
 		}
 		set_dc(0);
@@ -137,7 +145,7 @@ void load_lut(const uint8_t bank, const uint8_t data[]) {
 		send(data == 0 ? 0 : data[j]);
 	}
 
-	if (bank != 1) {
+	if (bank == 1) {
 		for (int j = 0; j < 18; ++j) {
 			send(0);
 		}

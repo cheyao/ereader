@@ -43,7 +43,7 @@ void wait_busy(void) {
 		;
 	while (SPI1->STATR & SPI_STATR_BSY)
 		;
-	Delay_Ms(1);
+	// Delay_Ms(1);
 	while (!funDigitalRead(BUSY))
 		;
 }
