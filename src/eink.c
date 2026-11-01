@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "peripherals.h"
+#include "ports.h"
 #include "lut-opt.h"
 
 const static uint8_t Eink_Init_Code[] = {
@@ -37,14 +38,14 @@ void init_eink(void) {
 	send(0x10);
 	set_dc(1);
 	for (int i = 0; i < 800 * 480 / 8; ++i) {
-		send(0xFF);
+		send(0x00);
 	}
 	set_dc(0);
 
 	send(0x13);
 	set_dc(1);
 	for (int i = 0; i < 800 * 480 / 8; ++i) {
-		send(0x00);
+		send(0xFF);
 	}
 	set_dc(0);
 
