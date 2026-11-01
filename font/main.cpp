@@ -43,27 +43,28 @@ int main() {
 
 		int w, h, xoff, yoff;
 		const auto bitmap = stbtt_GetCodepointBitmap(
-				&font, 0, stbtt_ScaleForPixelHeight(&font, 28), c, &w, &h,
+				&font, 0, stbtt_ScaleForPixelHeight(&font, 32), c, &w, &h,
 				&xoff, &yoff);
 
 		int advance, lsb;
 		stbtt_GetCodepointHMetrics(&font, c, &advance, &lsb);
-		auto scale = stbtt_ScaleForPixelHeight(&font, 28);
+		auto scale = stbtt_ScaleForPixelHeight(&font, 32);
 
 		printf("0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X,\n    ", w, h,
 			   (uint8_t)xoff, (uint8_t)yoff, (int)lroundf(advance * scale),
 			   (int)lroundf(advance * scale));
 
-		index += 2;
+		index += 6;
 
 		for (int i = 0; i < h; ++i) {
 			for (int j = 0; j < w; j += 4) {
 				uint8_t out = 0;
 				for (int num = 0; num < 4; ++num) {
-					const uint8_t a = map(bitmap[i * w + j]) / 85;
+                    const uint8_t a = (j + num < w) ? map(bitmap[i * w + j + num]) / 85 : 0;
 					out = out << 2;
 					out += a;
 				}
+
 				printf("0x%02X,", out);
 				if (j + 4 < w) {
 					printf(" ");
@@ -85,7 +86,7 @@ int main() {
 	printf("};\n\n");
 
 	// Print offset table
-	printf("const uint8_t offset_table[] = {\n    ");
+	printf("const uint32_t offset_table[] = {\n    ");
 	int i = 0;
 	for (const auto offset : offsets) {
 		printf("%d, ", offset);
