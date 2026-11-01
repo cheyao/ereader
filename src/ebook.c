@@ -14,30 +14,28 @@
 #define HEIGHT 152
 #define WIDTH 152
 
+#define REG_C 0x20
+#define REG_WW 0x21
+#define REG_KW 0x22
+#define REG_WK 0x23
+#define REG_KK 0x24
+
 const uint8_t Eink_Software_Reset[] = {0x00, 1, 0x10};
 const uint8_t Eink_Init_Code[] = {
 		// Commands to initialize eink
-		// Panel Settings: LUT from OTP, BW mode, scan up, shift right, booster
-		// on
-		0x00,
-		1,
-		0x3F,
+		// Panel Settings: Reg LUT, BW mode, Scan up, Shift right, Booster on
+		0x00, 1, 0x3F,
 		// PLL Clock Frequency
-		0x30,
-		1,
-		0x06,
-};
+		0x30, 1, 0x06,
+		// VCOM and DATA Interval Setting
+		// LUT with OLD/NEW
+		0x50, 2, 0x31, 0x03};
 const uint8_t Eink_Refresh[] = {
 		// Display update control 2 - enable clock -> enable analog -> display
 		// w/ mode 1 -> disable analog -> disable clock
 		0x22, 1, 0xC7,
 		// Execute master update
 		0x20, 0};
-const uint8_t Eink_Reset_Cursor[] = {// Set RAM X address
-									 0x4E, 1, 0x00,
-									 // Set RAM Y address
-									 0x4F, 2, (HEIGHT - 1) % 256,
-									 (HEIGHT - 1) / 256};
 
 void wait_busy(void) {
 	while (!(SPI1->STATR & SPI_STATR_TXE))
@@ -121,7 +119,7 @@ void send_lut(const uint8_t TR[]) {
 		set_dc(1);
 		for (int j = 0; j < 42; ++j) {
 			if (i == 1 || i == 4) {
-                // Void useless LUTs
+				// Void useless LUTs
 				send(0x00);
 			} else {
 				send(TR[6 + i * 42 + j]);
@@ -139,6 +137,21 @@ void send_lut(const uint8_t TR[]) {
 	// Border LUT is never used so ignore
 
 	wait_busy();
+}
+
+void load_lut(const uint8_t bank, const uint8_t data[]) {
+	send(bank);
+	set_dc(1);
+	for (int j = 0; j < 42; ++j) {
+		send(data[j]);
+	}
+
+	if (bank != 1) {
+		for (int j = 0; j < 18; ++j) {
+			send(0);
+		}
+	}
+	set_dc(0);
 }
 
 int8_t get_temperature(void) {
@@ -208,7 +221,7 @@ int main() {
 	SPI1->CTLR2 = CTLR2_SSOE_Set;
 	SPI1->CTLR1 = SPI_DataSize_8b | SPI_FirstBit_MSB | SPI_CPHA_1Edge |
 				  SPI_CPOL_Low | SPI_Direction_1Line_Tx | SPI_Mode_Master |
-				  SPI_BaudRatePrescaler_32 | CTLR1_SPE_Set;
+				  SPI_BaudRatePrescaler_8 | CTLR1_SPE_Set;
 	// Max SPI_BaudRatePrescaler_4 aka 36MHz overclock
 	// SPI_BaudRatePrescaler_8 is within datasheet limits: 18MHz
 
@@ -225,14 +238,12 @@ int main() {
 
 	send_lut(TR_20);
 
-	/*
 	send(0x10);
 	set_dc(1);
 	for (int i = 0; i < 800 * 480 / 8; ++i) {
-		send(0x0F);
+		send(0xF0);
 	}
 	set_dc(0);
-	*/
 
 	send(0x13);
 	set_dc(1);
