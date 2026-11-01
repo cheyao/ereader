@@ -11,7 +11,7 @@
 const static uint8_t Eink_Init_Code[] = {
 		// Commands to initialize eink
 		// Panel Settings: Reg LUT, BW mode, Scan up, Shift right, Booster on
-		0x00, 1, 0x3F,
+		0x00, 1, 0x37,
 		// PLL Clock Frequency
 		0x30, 1, 0x06,
 		// VCOM and DATA Interval Setting
@@ -145,7 +145,7 @@ void load_lut(const uint8_t bank, const uint8_t data[]) {
 		send(data == 0 ? 0 : data[j]);
 	}
 
-	if (bank == 1) {
+	if (bank != REG_WW) {
 		for (int j = 0; j < 18; ++j) {
 			send(0);
 		}
