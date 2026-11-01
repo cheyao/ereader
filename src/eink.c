@@ -16,7 +16,9 @@ const static uint8_t Eink_Init_Code[] = {
 		0x30, 1, 0x06,
 		// VCOM and DATA Interval Setting
 		// LUT with OLD/NEW
-		0x50, 2, 0x21, 0x03};
+		0x50, 2, 0x21, 0x03,
+		// Resolution
+		0x61, 4, (HEIGHT / 256), (HEIGHT % 256), (WIDTH / 256), (WIDTH % 256)};
 
 void init_eink(void) {
 	// Reset the screen
@@ -34,7 +36,10 @@ void init_eink(void) {
 	const uint32_t end = funSysTick32();
 	printf("Booster power on took %ld\n", end - start);
 
-	send_lut(TR_20);
+	setup_lut(DEFAULT_LUT_SETTINGS);
+
+	load_lut(REG_C, INIT_LUT_C);
+	load_lut(REG_KW, INIT_LUT_KW);
 
 	// Clear screen
 	send(0x10);
@@ -62,7 +67,7 @@ void refresh(void) {
 	printf("Refreshed: %ld\n", end - start);
 }
 
-void send_lut(const uint8_t TR[]) {
+void setup_lut(const uint8_t TR[]) {
 	// Frame rate
 	send(0x30);
 	set_dc(1);
@@ -79,7 +84,7 @@ void send_lut(const uint8_t TR[]) {
 	send(0x01);
 	set_dc(1);
 	send(0b00111); // Internal DC/DC
-	send((TR[0] & 0x03) | (0b1 << 4));
+	send((TR[0] & 0x07) | (0b1 << 4));
 	send(TR[1] & 0x3F);
 	send(TR[2] & 0x3F);
 	send(TR[3] & 0x3F);
@@ -103,27 +108,24 @@ void send_lut(const uint8_t TR[]) {
 	send(TR[5]); // -1.90 VCOM
 	set_dc(0);
 
+	// Clear luts
 	for (int i = 0; i < 5; ++i) {
 		send(0x20 + i);
 		set_dc(1);
-		for (int j = 0; j < 42; ++j) {
-			if (i == 1 || i == 4) {
-				// Void useless LUTs
-				send(0x00);
-			} else {
-				send(TR[6 + i * 42 + j]);
-			}
-		}
+
+		int num = 42;
 
 		if (i != 1) {
-			for (int j = 0; j < 18; ++j) {
-				send(0);
-			}
+			num += 18;
+		}
+
+		for (int j = 0; j < 42; ++j) {
+			send(0);
 		}
 		set_dc(0);
 	}
 
-	// Border LUT is never used so ignore
+	// Border LUT is LUTKW (BDV[1:0] = 0b10)
 
 	wait_busy();
 }
@@ -132,7 +134,7 @@ void load_lut(const uint8_t bank, const uint8_t data[]) {
 	send(bank);
 	set_dc(1);
 	for (int j = 0; j < 42; ++j) {
-		send(data[j]);
+		send(data == 0 ? 0 : data[j]);
 	}
 
 	if (bank != 1) {

@@ -7,7 +7,7 @@ void init_eink(void);
 void refresh(void);
 
 // LUT operations
-void send_lut(const uint8_t TR[]);
+void setup_lut(const uint8_t LUT_SETTINGS[]);
 void load_lut(const uint8_t bank, const uint8_t data[]);
 
 // Misc
