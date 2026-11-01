@@ -11,6 +11,8 @@ void send_lut(const uint8_t TR[]);
 void load_lut(const uint8_t bank, const uint8_t data[]);
 
 // Misc
+void power_on(void);
+void power_off(void);
 int8_t get_temperature(void);
 
 #endif // EINK_H

@@ -19,9 +19,11 @@ int main() {
 	init_peripherals();
 	init_eink();
 
-    // The Eink screen is guarenteed to be blank rn
+	// The Eink screen is guarenteed to be blank rn
 
 	printf("Temp: %d C\n", get_temperature());
+
+	power_off();
 
 	while (1)
 		;

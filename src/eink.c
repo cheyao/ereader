@@ -30,8 +30,7 @@ void init_eink(void) {
 
 	// Power ON booster
 	const uint32_t start = funSysTick32();
-	send(0x04);
-	wait_busy();
+	power_on();
 	const uint32_t end = funSysTick32();
 	printf("Booster power on took %ld\n", end - start);
 
@@ -142,6 +141,16 @@ void load_lut(const uint8_t bank, const uint8_t data[]) {
 		}
 	}
 	set_dc(0);
+}
+
+void power_on(void) {
+	send(0x04);
+	wait_busy();
+}
+
+void power_off(void) {
+	send(0x02);
+	wait_busy();
 }
 
 int8_t get_temperature(void) {
