@@ -1,4 +1,5 @@
 #include "ch32fun.h"
+#include "lut-opt.h"
 
 #include <stdio.h>
 
@@ -13,46 +14,38 @@
 #define HEIGHT 152
 #define WIDTH 152
 
+const uint8_t Eink_Software_Reset[] = {0x00, 1, 0x10};
 const uint8_t Eink_Init_Code[] = {
 		// Commands to initialize eink
-		// Gate settings
-		0x01, 3, (HEIGHT - 1) % 256, (HEIGHT - 1) / 256, 0x00,
-		// Data entry mode - Y dec X inc
-		0x11, 1, 0x01,
-		// RAM X Window
-		0x44, 2, 0x00, WIDTH / 8 - 1,
-		// RAM Y Window
-		0x45, 4, (HEIGHT - 1) % 256, (HEIGHT - 1) / 256, 0x00, 0x00,
-		// Border waveform
-		0x3C, 1, 0x05,
-		// Read built-in temperature
-		0x18, 1, 0x80,
-		// Display update control 1 - Normal RAM, source from S8 to S167 (why)
-		0x21, 2, 0x00, 0x80,
-		// Display update control 2 - enable clock -> load temp -> load LUT ->
-		// disable clock
-		0x22, 1, 0xB1,
-		// Execute master update
-		0x20, 0};
+		// Panel Settings: LUT from OTP, BW mode, scan up, shift right, booster
+		// on
+		0x00,
+		1,
+		0x3F,
+		// PLL Clock Frequency
+		0x30,
+		1,
+		0x06,
+};
 const uint8_t Eink_Refresh[] = {
 		// Display update control 2 - enable clock -> enable analog -> display
 		// w/ mode 1 -> disable analog -> disable clock
 		0x22, 1, 0xC7,
 		// Execute master update
 		0x20, 0};
-const uint8_t Eink_Reset_Cursor[] = {
-		// Set RAM X address
-		0x4E, 1,
-		0x00, 
-        // Set RAM Y address
-		0x4F, 2, (HEIGHT - 1) % 256, (HEIGHT - 1) / 256};
+const uint8_t Eink_Reset_Cursor[] = {// Set RAM X address
+									 0x4E, 1, 0x00,
+									 // Set RAM Y address
+									 0x4F, 2, (HEIGHT - 1) % 256,
+									 (HEIGHT - 1) / 256};
 
 void wait_busy(void) {
 	while (!(SPI1->STATR & SPI_STATR_TXE))
 		;
 	while (SPI1->STATR & SPI_STATR_BSY)
 		;
-	while (funDigitalRead(BUSY))
+	Delay_Ms(1);
+	while (!funDigitalRead(BUSY))
 		;
 }
 
@@ -82,6 +75,112 @@ void send_sequence(const uint8_t data[], const int length) {
 	}
 }
 
+void send_lut(const uint8_t TR[]) {
+	// Frame rate
+	send(0x30);
+	set_dc(1);
+	send(TR[0] >> 4);
+	set_dc(0);
+
+	// End voltage
+	send(0x52);
+	set_dc(1);
+	send((TR[0] & 0b1000) | (TR[1] >> 6));
+	set_dc(0);
+
+	// Power settings
+	send(0x01);
+	set_dc(1);
+	send(0b00111); // Internal DC/DC
+	send((TR[0] & 0x03) | (0b1 << 4));
+	send(TR[1] & 0x3F);
+	send(TR[2] & 0x3F);
+	send(TR[3] & 0x3F);
+	set_dc(0);
+
+	send(0x2A);
+	set_dc(1);
+	send(TR[2] & (0x3 << 6));
+	send(TR[4]);
+	set_dc(0);
+
+	send(0x2B);
+	set_dc(1);
+	send(0b01);
+	send(TR[3] & (0x3 << 6));
+	send(0); // No KWE[7:0]
+	set_dc(0);
+
+	send(0x82);
+	set_dc(1);
+	send(TR[5]); // -1.90 VCOM
+	set_dc(0);
+
+	for (int i = 0; i < 5; ++i) {
+		send(0x20 + i);
+		set_dc(1);
+		for (int j = 0; j < 42; ++j) {
+			if (i == 1 || i == 4) {
+                // Void useless LUTs
+				send(0x00);
+			} else {
+				send(TR[6 + i * 42 + j]);
+			}
+		}
+
+		if (i != 1) {
+			for (int j = 0; j < 18; ++j) {
+				send(0);
+			}
+		}
+		set_dc(0);
+	}
+
+	// Border LUT is never used so ignore
+
+	wait_busy();
+}
+
+int8_t get_temperature(void) {
+	// Enable (optional)
+	send(0x41);
+	set_dc(1);
+	send(0x0);
+	set_dc(0);
+
+	// Now really read the value
+	send(0x40);
+	set_dc(1);
+
+	(void)SPI1->DATAR;
+
+	SPI1->CTLR1 &= ~CTLR1_SPE_Set;
+	SPI1->CTLR1 &= ~SPI_CTLR1_BIDIOE;
+	SPI1->CTLR1 |= CTLR1_SPE_Set;
+
+	uint8_t buf[2];
+
+	__disable_irq();
+	for (int i = 0; i < 2 - 1; ++i) {
+		while (!(SPI1->STATR & SPI_STATR_RXNE))
+			;
+		buf[i] = SPI1->DATAR;
+	}
+	// Clear last value
+	SPI1->CTLR1 &= ~CTLR1_SPE_Set;
+	while (!(SPI1->STATR & SPI_STATR_RXNE))
+		;
+	buf[1] = SPI1->DATAR;
+	__enable_irq();
+
+	SPI1->CTLR1 |= SPI_CTLR1_BIDIOE;
+	SPI1->CTLR1 |= CTLR1_SPE_Set;
+
+	set_dc(0);
+
+	return buf[0];
+}
+
 int main() {
 	SystemInit();
 	funGpioInitAll();
@@ -97,9 +196,9 @@ int main() {
 
 	// Reset the chip
 	funDigitalWrite(RESET, 0);
-	Delay_Ms(10);
+	Delay_Ms(1);
 	funDigitalWrite(RESET, 1);
-	Delay_Ms(10);
+	Delay_Ms(4);
 
 	// Setup SPI
 	RCC->APB2PRSTR = RCC_SPI1RST;
@@ -113,25 +212,40 @@ int main() {
 	// Max SPI_BaudRatePrescaler_4 aka 36MHz overclock
 	// SPI_BaudRatePrescaler_8 is within datasheet limits: 18MHz
 
-	// Restart
-	send(0x12);
 	wait_busy();
 
 	send_sequence(Eink_Init_Code, sizeof(Eink_Init_Code));
 	wait_busy();
 
-	send_sequence(Eink_Reset_Cursor, sizeof(Eink_Reset_Cursor));
+	// Power ON
+	send(0x04);
+	wait_busy();
 
-	send(0x24);
+	printf("Temp: %d C\n", get_temperature());
+
+	send_lut(TR_20);
+
+	/*
+	send(0x10);
 	set_dc(1);
-	// 152 x 152
-	for (int i = 0; i < 2888; ++i) {
-		send(0xF9);
+	for (int i = 0; i < 800 * 480 / 8; ++i) {
+		send(0x0F);
+	}
+	set_dc(0);
+	*/
+
+	send(0x13);
+	set_dc(1);
+	for (int i = 0; i < 800 * 480 / 8; ++i) {
+		send(0xF0);
 	}
 	set_dc(0);
 
-	send_sequence(Eink_Refresh, sizeof(Eink_Refresh));
+	uint32_t start = funSysTick32();
+	send(0x12);
 	wait_busy();
+	uint32_t end = funSysTick32();
+	printf("Used: %d", end - start);
 
 	while (1)
 		;
