@@ -3,6 +3,7 @@
 .idea
 *.elf
 *.hex
+*.o
 *.lst
 *.bin
 *.map
