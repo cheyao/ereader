@@ -6,6 +6,9 @@
 #include "peripherals.h"
 #include "ports.h"
 
+// For UC8179 IC
+// https://www.buydisplay.com/download/ic/UC8179.pdf
+
 // Refresh over 4 frames
 // -> Gray
 
@@ -15,6 +18,8 @@ int main() {
 
 	init_peripherals();
 	init_eink();
+
+    // The Eink screen is guarenteed to be blank rn
 
 	printf("Temp: %d C\n", get_temperature());
 

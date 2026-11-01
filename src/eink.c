@@ -4,9 +4,9 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "lut-opt.h"
 #include "peripherals.h"
 #include "ports.h"
-#include "lut-opt.h"
 
 const static uint8_t Eink_Init_Code[] = {
 		// Commands to initialize eink
@@ -16,7 +16,7 @@ const static uint8_t Eink_Init_Code[] = {
 		0x30, 1, 0x06,
 		// VCOM and DATA Interval Setting
 		// LUT with OLD/NEW
-		0x50, 2, 0x31, 0x03};
+		0x50, 2, 0x21, 0x03};
 
 void init_eink(void) {
 	// Reset the screen
@@ -29,8 +29,11 @@ void init_eink(void) {
 	wait_busy();
 
 	// Power ON booster
+	const uint32_t start = funSysTick32();
 	send(0x04);
 	wait_busy();
+	const uint32_t end = funSysTick32();
+	printf("Booster power on took %ld\n", end - start);
 
 	send_lut(TR_20);
 
@@ -53,10 +56,10 @@ void init_eink(void) {
 }
 
 void refresh(void) {
-	uint32_t start = funSysTick32();
+	const uint32_t start = funSysTick32();
 	send(0x12);
 	wait_busy();
-	uint32_t end = funSysTick32();
+	const uint32_t end = funSysTick32();
 	printf("Refreshed: %ld\n", end - start);
 }
 
