@@ -41,16 +41,16 @@ int main() {
 	for (char c = '!'; c <= '~'; ++c) {
 		offsets.emplace_back(index);
 
-        int size = 24;
+		int size = 24;
 
 		int w, h, xoff, yoff;
 		const auto bitmap = stbtt_GetCodepointBitmap(
-				&font, 0, stbtt_ScaleForPixelHeight(&font, 24), c, &w, &h,
+				&font, 0, stbtt_ScaleForPixelHeight(&font, size), c, &w, &h,
 				&xoff, &yoff);
 
 		int advance, lsb;
 		stbtt_GetCodepointHMetrics(&font, c, &advance, &lsb);
-		auto scale = stbtt_ScaleForPixelHeight(&font, 24);
+		auto scale = stbtt_ScaleForPixelHeight(&font, size);
 
 		printf("0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X,\n    ", w, h,
 			   (uint8_t)xoff, (uint8_t)yoff, (int)lroundf(advance * scale),
@@ -58,23 +58,54 @@ int main() {
 
 		index += 6;
 
-		for (int i = 0; i < h; ++i) {
-			for (int j = 0; j < w; j += 4) {
-				uint8_t out = 0;
-				for (int num = 0; num < 4; ++num) {
-                    const uint8_t a = (j + num < w) ? map(bitmap[i * w + j + num]) / 85 : 0;
-					out = out << 2;
-					out += a;
+		for (int i = 0; i < w; ++i) {
+			for (int j = 0; j < h; j += 8) {
+				uint8_t data = 0;
+
+				for (int num = 0; num < 8; ++num) {
+					const uint8_t a =
+							(j + num < h) ? map(bitmap[i + w * (j + num)]) / 85
+										  : 0;
+					data <<= 1;
+					data += (a >> 0) & 1;
 				}
 
-				printf("0x%02X,", out);
-				if (j + 4 < w) {
+				printf("0x%02X,", data);
+				if (j + 8 < h) {
 					printf(" ");
 				}
 				++index;
 			}
 
-			if (c != '~' || i != h - 1) {
+			if (c != '~' || i != w - 1) {
+				printf("\n    ");
+			} else {
+				printf("\n");
+			}
+		}
+
+		printf("\n    ");
+
+		for (int i = 0; i < w; ++i) {
+			for (int j = 0; j < h; j += 8) {
+				uint8_t data = 0;
+
+				for (int num = 0; num < 8; ++num) {
+					const uint8_t a =
+							(j + num < h) ? map(bitmap[i + w * (j + num)]) / 85
+										  : 0;
+					data <<= 1;
+					data += (a >> 1) & 1;
+				}
+
+				printf("0x%02X,", data);
+				if (j + 8 < h) {
+					printf(" ");
+				}
+				++index;
+			}
+
+			if (c != '~' || i != w - 1) {
 				printf("\n    ");
 			} else {
 				printf("\n");
