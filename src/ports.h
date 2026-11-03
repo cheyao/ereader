@@ -9,11 +9,13 @@
 #define CLK PA5
 #define MOSI PA7
 
-#define REG_C 0x20
-#define REG_WW 0x21
-#define REG_KW 0x22
-#define REG_WK 0x23
-#define REG_KK 0x24
+#define BUTTON PB2
+
+#define REG_C 0x00
+#define REG_WW 0x01
+#define REG_KW 0x02
+#define REG_WK 0x03
+#define REG_KK 0x04
 
 // Decrease this to emulate a smaller screen
 #define HEIGHT 800

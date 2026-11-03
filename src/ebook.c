@@ -6,6 +6,7 @@
 #include "lut-opt.h"
 #include "peripherals.h"
 #include "ports.h"
+#include "renderer.h"
 
 // For UC8179 IC
 // https://www.buydisplay.com/download/ic/UC8179.pdf
@@ -18,27 +19,56 @@ static uint8_t glyph_pixel(const uint8_t* g, int w, int row, int col) {
 	return (g[row * stride + col / 4] >> (6 - 2 * (col % 4))) & 0x3;
 }
 
-static void send_glyph(const uint8_t* g, int w, int h, uint8_t threshold) {
-	send(0x13);
-	set_dc(1);
-	for (int i = 0; i < HEIGHT * WIDTH / 8; ++i) {
-		const int x = i / (HEIGHT / 8);
-		const int y = i % (HEIGHT / 8);
-		uint8_t output = 0xFF;
+static void draw_glyph(const uint8_t* g, int w, int h) {
+	for (int x = 0; x < w; ++x) {
+		for (int y = 0; y < h; ++y) {
+			// White: WW
+			const uint8_t color = glyph_pixel(g, w, x, y);
 
-		if (x < w) {
-			for (int l = 0; l < 8; ++l) {
-				const int row = y * 8 + l;
-				output <<= 1;
-				if (row >= h || glyph_pixel(g, w, row, x) < threshold) {
-					output |= 1;
-				}
+			// buffer_old[x][y / 8] = 0xFF;
+			// buffer_new[x][y / 8] = 0;
+			// buffer_current[x][y] = render;
+		}
+	}
+}
+
+void update(void) {
+	char letter = 'e';
+	uint32_t glyph = offset_table[letter - '!'];
+	int w = font_table[offset_table[letter - '!']],
+		h = font_table[offset_table[letter - '!'] + 1];
+
+	send(0x10);
+	set_dc(1);
+	for (int x = 0; x < WIDTH; ++x) {
+		for (int y = 0; y < HEIGHT / 8; ++y) {
+			const uint8_t height = (h / 8 + !!(h % 8));
+			if (x < w && y < height) {
+				// LSB
+				send(font_table[6 + x * height + y + glyph]);
+			} else {
+				send(((x % (WIDTH / 2)) > WIDTH / 4) ? 0xFF : 0x00);
 			}
 		}
-		send(output);
+	}
+	set_dc(0);
+
+	send(0x13);
+	set_dc(1);
+	for (int x = 0; x < WIDTH; ++x) {
+		for (int y = 0; y < HEIGHT / 8; ++y) {
+			const uint8_t height = (h / 8 + !!(h % 8));
+			if (x < w && y < height) {
+				send(font_table[6 + (x + w) * height + y + glyph]);
+			} else {
+				send(x > WIDTH / 2 ? 0xFF : 0x00);
+			}
+		}
 	}
 	set_dc(0);
 }
+
+const static char text[] = "Hello!";
 
 int main() {
 	SystemInit();
@@ -49,60 +79,36 @@ int main() {
 
 	// The Eink screen is guarenteed to be blank rn
 
-	// printf("Temp: %d C\n", get_temperature());
-
 	Delay_Ms(2000);
 
-	load_lut(REG_KW, 0);
-	load_lut(REG_WW, 0);
-
-	// Set OLD to full white
-	send(0x10);
-	set_dc(1);
-	for (int i = 0; i < 800 * 480 / 8; ++i) {
-		send(0xFF);
-	}
-	set_dc(0);
-
-	// TODO: Condense three passes into one
-    char letter = 'b';
-	const uint8_t* glyph = &font_table[offset_table[letter - '!'] + 6];
-	int w = font_table[offset_table[letter - '!']],
-		h = font_table[offset_table[letter - '!'] + 1];
-
 	// Black
-	load_lut(REG_C, LUT_C_WK);
-	load_lut(REG_WK, LUT_WK);
+	uint32_t start = funSysTick32();
+	load_lut_short(REG_C, 0x00);
+	load_lut_short(REG_WW, 0x54);
+	load_lut_short(REG_KW, 0x50);
+	load_lut_short(REG_WK, 0x40);
+	load_lut_short(REG_KK, 0x00);
 
-	send_glyph(glyph, w, h, 3);
+	update();
 	refresh();
 
-	// Dark gray
-	load_lut(REG_C, LUT_C_WDK);
-	load_lut(REG_WW, LUT_WW_WDK);
-	load_lut(REG_WK, LUT_WDK);
+	uint32_t end = funSysTick32();
+	printf("Screen redraw took %ld/%d ticks\n", end - start,
+		   DELAY_SEC_COUNT(1));
 
-	send_glyph(glyph, w, h, 2);
+	Delay_Ms(5000);
+
+	start = funSysTick32();
+	load_lut_short(REG_WW, 0xA8);
+	load_lut_short(REG_KW, 0xA0);
+	load_lut_short(REG_WK, 0x80);
+	load_lut_short(REG_KK, 0x00);
 	refresh();
+	end = funSysTick32();
+	printf("Screen erasal took %ld/%d ticks\n", end - start,
+		   DELAY_SEC_COUNT(1));
 
-	// Light gray
-	send_glyph(glyph, w, h, 1);
-	refresh();
-
-	/*
-	send(0x13);
-	set_dc(1);
-	for (int i = 0; i < HEIGHT * WIDTH / 8; ++i) {
-		if (i >= (HEIGHT * WIDTH / 8) / 4 * 1) {
-			send(0x00);
-		} else {
-			send(0xFF);
-		}
-	}
-	set_dc(0);
-	*/
-
-	Delay_Ms(30000);
+	Delay_Ms(10000);
 
 	// End program
 	power_off();
@@ -110,3 +116,21 @@ int main() {
 	while (1)
 		;
 }
+
+__attribute__((interrupt)) void EXTI2_IRQHandler(void) {
+	EXTI->INTFR = 1 << 2;
+	printf("hi");
+}
+
+/*
+send(0x13);
+set_dc(1);
+for (int i = 0; i < HEIGHT * WIDTH / 8; ++i) {
+	if (i >= (HEIGHT * WIDTH / 8) / 4 * 1) {
+		send(0x00);
+	} else {
+		send(0xFF);
+	}
+}
+set_dc(0);
+*/

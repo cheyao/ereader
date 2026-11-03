@@ -8,6 +8,7 @@
 #include "peripherals.h"
 #include "ports.h"
 
+// TODO: 0x06 soft start
 const static uint8_t Eink_Init_Code[] = {
 		// Commands to initialize eink
 		// Panel Settings: Reg LUT, BW mode, Scan up, Shift right, Booster on
@@ -59,7 +60,7 @@ void init_eink(void) {
 
 	refresh();
 
-    // Disable border
+	// Disable border
 	send(0x50);
 	set_dc(1);
 	send(0xA1);
@@ -75,45 +76,45 @@ void refresh(void) {
 	printf("Refreshed: %ld\n", end - start);
 }
 
-void setup_lut(const uint8_t TR[]) {
+void setup_lut(const uint8_t LUT_SETTINGS[]) {
 	// Frame rate
 	send(0x30);
 	set_dc(1);
-	send(TR[0] >> 4);
+	send(LUT_SETTINGS[0] >> 4);
 	set_dc(0);
 
 	// End voltage
 	send(0x52);
 	set_dc(1);
-	send((TR[0] & 0b1000) | (TR[1] >> 6));
+	send((LUT_SETTINGS[0] & 0b1000) | (LUT_SETTINGS[1] >> 6));
 	set_dc(0);
 
 	// Power settings
 	send(0x01);
 	set_dc(1);
 	send(0b00111); // Internal DC/DC
-	send((TR[0] & 0x07) | (0b1 << 4));
-	send(TR[1] & 0x3F);
-	send(TR[2] & 0x3F);
-	send(TR[3] & 0x3F);
+	send((LUT_SETTINGS[0] & 0x07) | (0b1 << 4));
+	send(LUT_SETTINGS[1] & 0x3F);
+	send(LUT_SETTINGS[2] & 0x3F);
+	send(LUT_SETTINGS[3] & 0x3F);
 	set_dc(0);
 
 	send(0x2A);
 	set_dc(1);
-	send(TR[2] & (0x3 << 6));
-	send(TR[4]);
+	send(LUT_SETTINGS[2] & (0x3 << 6));
+	send(LUT_SETTINGS[4]);
 	set_dc(0);
 
 	send(0x2B);
 	set_dc(1);
 	send(0b01);
-	send(TR[3] & (0x3 << 6));
+	send(LUT_SETTINGS[3] & (0x3 << 6));
 	send(0); // No KWE[7:0]
 	set_dc(0);
 
 	send(0x82);
 	set_dc(1);
-	send(TR[5]); // -1.90 VCOM
+	send(LUT_SETTINGS[5]); // -1.90 VCOM
 	set_dc(0);
 
 	// Clear luts
@@ -138,8 +139,28 @@ void setup_lut(const uint8_t TR[]) {
 	wait_busy();
 }
 
+void load_lut_short(const uint8_t bank, const uint8_t data) {
+	send(bank + 0x20);
+	set_dc(1);
+	send(data);
+	for (int j = 0; j < 5; ++j) {
+		send(LUT_SHORT_DELAYS[j]);
+	}
+
+	for (int j = 0; j < 36; ++j) {
+		send(0);
+	}
+
+	if (bank != REG_WW) {
+		for (int j = 0; j < 18; ++j) {
+			send(0);
+		}
+	}
+	set_dc(0);
+}
+
 void load_lut(const uint8_t bank, const uint8_t data[]) {
-	send(bank);
+	send(bank + 0x20);
 	set_dc(1);
 	for (int j = 0; j < 42; ++j) {
 		send(data == 0 ? 0 : data[j]);

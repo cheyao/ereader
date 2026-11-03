@@ -27,6 +27,20 @@ void init_peripherals(void) {
 	// Max SPI_BaudRatePrescaler_4 aka 36MHz overclock
 	// SPI_BaudRatePrescaler_8 is within datasheet limits: 18MHz
 
+	// Button
+	funPinMode(BUTTON, GPIO_CFGLR_IN_FLOAT);
+
+	// Interrupt for button
+	AFIO->EXTICR[0] = 1 << 8;
+
+	// Falling edge
+	EXTI->RTENR &= ~(1 << 2);
+	EXTI->FTENR |= 1 << 2;
+
+	NVIC_EnableIRQ(EXTI2_IRQn);
+
+	EXTI->INTENR |= 1 << 2;
+
 	wait_busy();
 }
 
@@ -65,3 +79,4 @@ void send_sequence(const uint8_t data[], const int length) {
 		i += data[i + 1] + 1;
 	}
 }
+
