@@ -1,34 +1,18 @@
 #ifndef LUT_H
 #define LUT_H
 
-#define FRAMES_BLACK 0x0C
+#define FRAMES_BLACK 0x0F
 #define FRAMES_DGRAY 0x06
 #define FRAMES_LGRAY 0x07
 
-// White -> Color LUTs
-const static uint8_t LUT_C_WK[] = {0x00, FRAMES_LGRAY, FRAMES_DGRAY, FRAMES_BLACK, 0x00, 0x01};
-// Black      -> 27 frames
-const static uint8_t LUT_WW[] = {0x54, FRAMES_LGRAY, FRAMES_DGRAY, FRAMES_BLACK, 0x00, 0x01};
-// Dark gray  -> 20 frames
-const static uint8_t LUT_KW[] = {0x50, FRAMES_LGRAY, FRAMES_DGRAY, FRAMES_BLACK, 0x00, 0x01};
-// Light gray -> 16 frames
-const static uint8_t LUT_WK[] = {0x40, FRAMES_LGRAY, FRAMES_DGRAY, FRAMES_BLACK, 0x00, 0x01};
-// White
-const static uint8_t LUT_KK[] = {0x00, FRAMES_LGRAY, FRAMES_DGRAY, FRAMES_BLACK, 0x00, 0x01};
+// Enough pixels to drive black to white
+#define WHITE_OFFSET 0x2A - FRAMES_BLACK
 
-const static uint8_t LUT_SHORT_DELAYS[] = {FRAMES_LGRAY, FRAMES_DGRAY, FRAMES_BLACK, 0x00, 0x01};
-
-/*
-const static uint8_t LUT_KW[] = {
-	0x10, 0x20, 0x3C, 0x00, 0x00, 0x01,
-	0x90, 0x0D, 0x0D, 0x00, 0x00, 0x01,
-	0x2A, 0x2F, 0x28, 0x0A, 0x0A, 0x01,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-};
-*/
+// White -> Color delay LUTs
+const static uint8_t LUT_WB_DELAYS[] = {FRAMES_LGRAY, FRAMES_DGRAY,
+										FRAMES_BLACK, 0x00, 0x01};
+const static uint8_t LUT_BW_DELAYS[] = {FRAMES_DGRAY, FRAMES_BLACK,
+										WHITE_OFFSET, FRAMES_BLACK, 0x01};
 
 // clang-format off
 // Startup LUT

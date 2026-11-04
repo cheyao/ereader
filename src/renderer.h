@@ -5,6 +5,8 @@
 
 #include "ports.h"
 
-// extern uint8_t buffer_current[WIDTH / 8 * 2][HEIGHT / 8 * 2];
+uint8_t glyph_pixel(const uint8_t* g, const int w, const int row,
+					const int col);
+void render_text(const char* text);
 
 #endif // RENDERER_H

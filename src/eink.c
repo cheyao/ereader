@@ -139,12 +139,12 @@ void setup_lut(const uint8_t LUT_SETTINGS[]) {
 	wait_busy();
 }
 
-void load_lut_short(const uint8_t bank, const uint8_t data) {
+void load_lut_short(const uint8_t bank, const uint8_t data, bool wtb) {
 	send(bank + 0x20);
 	set_dc(1);
 	send(data);
 	for (int j = 0; j < 5; ++j) {
-		send(LUT_SHORT_DELAYS[j]);
+		send(wtb ? LUT_WB_DELAYS[j] : LUT_BW_DELAYS[j]);
 	}
 
 	for (int j = 0; j < 36; ++j) {
