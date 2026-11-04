@@ -29,11 +29,25 @@ int main() {
 	int index = 0;
 	std::vector<int> offsets;
 
+	const int size = 24;
+	const auto scale = stbtt_ScaleForPixelHeight(&font, size);
+
+	int ascent, descent, lineGap;
+	stbtt_GetFontVMetrics(&font, &ascent, &descent, &lineGap);
+	const float baseline_y = ascent * scale;
+
 	printf("// Auto generated glyphs with font/main.cpp\n");
 	printf("// OpenSans-Regular, font licenses applies\n\n");
 
 	printf("#ifndef GLYPHS_H\n");
 	printf("#define GLYPHS_H\n\n");
+
+	printf("#define HEADER_LENGTH %d\n", 4);
+	printf("#define LINE_HEIGHT %d\n\n",
+		   (int)lroundf((ascent - descent + lineGap) * scale));
+	int space_advance;
+	stbtt_GetCodepointHMetrics(&font, ' ', &space_advance, 0);
+	printf("#define SPACE_ADVANCE %d\n", (int)lroundf(space_advance * scale));
 
 	printf("// clang-format off\n");
 
@@ -41,37 +55,36 @@ int main() {
 	for (char c = '!'; c <= '~'; ++c) {
 		offsets.emplace_back(index);
 
-		int size = 24;
-
 		int w, h, xoff, yoff;
 		const auto bitmap = stbtt_GetCodepointBitmap(
 				&font, 0, stbtt_ScaleForPixelHeight(&font, size), c, &w, &h,
 				&xoff, &yoff);
 
-		int advance, lsb;
-		stbtt_GetCodepointHMetrics(&font, c, &advance, &lsb);
-		auto scale = stbtt_ScaleForPixelHeight(&font, size);
+		int advance;
+		stbtt_GetCodepointHMetrics(&font, c, &advance, 0);
 
-		printf("0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X,\n    ", w, h,
-			   (uint8_t)xoff, (uint8_t)yoff, (int)lroundf(advance * scale),
-			   (int)lroundf(advance * scale));
+		uint8_t yoff_real = std::max(0, (int)lroundf(yoff + baseline_y));
 
-		index += 6;
+		printf("0x%02X, 0x%02X, 0x%02X, 0x%02X,\n    ", w, h + yoff_real,
+			   (uint8_t)std::max(xoff, 0), (int)lroundf(advance * scale));
+
+		index += 4;
 
 		for (int i = 0; i < w; ++i) {
-			for (int j = 0; j < h; j += 8) {
+			for (int j = 0; j < h + yoff_real; j += 8) {
 				uint8_t data = 0;
 
 				for (int num = 0; num < 8; ++num) {
-					const uint8_t a =
-							(j + num < h) ? map(bitmap[i + w * (j + num)]) / 85
-										  : 0;
+					const int row = j + num - yoff_real;
+					const uint8_t a = (row >= 0 && row < h)
+											  ? map(bitmap[i + w * row]) / 85
+											  : 0;
 					data <<= 1;
 					data += (a >> 0) & 1;
 				}
 
 				printf("0x%02X,", data);
-				if (j + 8 < h) {
+				if (j + 8 < h + yoff_real) {
 					printf(" ");
 				}
 				++index;
@@ -87,19 +100,20 @@ int main() {
 		printf("\n    ");
 
 		for (int i = 0; i < w; ++i) {
-			for (int j = 0; j < h; j += 8) {
+			for (int j = 0; j < h + yoff_real; j += 8) {
 				uint8_t data = 0;
 
 				for (int num = 0; num < 8; ++num) {
-					const uint8_t a =
-							(j + num < h) ? map(bitmap[i + w * (j + num)]) / 85
-										  : 0;
+					const int row = j + num - yoff_real;
+					const uint8_t a = (row >= 0 && row < h)
+											  ? map(bitmap[i + w * row]) / 85
+											  : 0;
 					data <<= 1;
 					data += (a >> 1) & 1;
 				}
 
 				printf("0x%02X,", data);
-				if (j + 8 < h) {
+				if (j + 8 < h + yoff_real) {
 					printf(" ");
 				}
 				++index;
@@ -115,6 +129,8 @@ int main() {
 		if (c != '~') {
 			printf("\n    ");
 		}
+
+		stbtt_FreeBitmap(bitmap, nullptr);
 	}
 	printf("};\n\n");
 
