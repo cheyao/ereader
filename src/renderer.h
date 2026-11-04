@@ -5,8 +5,7 @@
 
 #include "ports.h"
 
-uint8_t glyph_pixel(const uint8_t* g, const int w, const int row,
-					const int col);
 void render_text(const char* text);
+void render_text_partial(const char* text, const uint8_t buffer);
 
 #endif // RENDERER_H
