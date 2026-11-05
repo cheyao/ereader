@@ -10,7 +10,18 @@
 // For UC8179 IC
 // https://www.buydisplay.com/download/ic/UC8179.pdf
 
-const static char text[] = "And they were right to wonder. Right to suspect. But the truth was that it was all a feint. The game. Tulm. Even Niers’ question and his gift to Umina, which he’d have to come up with. Oh, he always had his game. And he always liked it to be fun. But this time, it had all been to arrange one meeting. Such a casual one that while everyone stared at Niers’ grand plots and designs, they missed the little trick, the moment hiding amid the grandeur.";
+// TODO: Normalize unicode
+const static char text[] =
+		"And they were right to wonder. Right to suspect. But the truth was "
+		"that it was all a feint. The game. Tulm. Even Niers' question and his "
+		"gift to Umina, which he'd have to come up with. Oh, he always had his "
+		"game. And he always liked it to be fun. But this time, it had all "
+		"been to arrange one meeting. Such a casual one that while everyone "
+		"stared at Niers' grand plots and designs, they missed the little "
+		"trick, the moment hiding amid the grandeur.\n\nNiers laughed to "
+		"himself. He'd nearly started a war to arrange a meeting. Good thing "
+		"Tulm hadn't won. Anyways.\n\nThat was what you called a proper "
+		"distraction.";
 const static char text2[] = "It's nice to meet you :D ~~";
 
 int main() {
@@ -39,7 +50,7 @@ int main() {
 	printf("Screen redraw took %ld/%d ticks\n", end - start,
 		   DELAY_SEC_COUNT(1));
 
-	Delay_Ms(10000);
+	Delay_Ms(15000);
 
 	start = funSysTick32();
 	load_lut_short(REG_C, 0x00, 0);

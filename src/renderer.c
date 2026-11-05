@@ -17,34 +17,66 @@ typedef struct Line {
 // TODO: = 33.333
 static Line lines[HEIGHT / LINE_HEIGHT + 1];
 
-void render_text(const char* text) {
+#define max(a, b) (((a) > (b)) ? (a) : (b))
+
+void prepare_text(const char* text) {
+	int line = 0;
+	int line_advance = 0;
+
 	lines[0].index = 0;
 	lines[0].advance = 0;
-
 	lines[0].remaining = 0;
+
+	// TODO: +2?
+	// TODO: SPACE in font table
 	for (int i = 0; text[i] != 0; ++i) {
-		lines[0].remaining += 1;
+		char c = text[i];
+		if (c < '!' || c > '~') {
+			c = '?';
+		}
+
+		const uintptr_t glyph_offset = offset_table[c - '!'];
+		const uint8_t glyph_advance =
+				text[i] == ' ' ? SPACE_ADVANCE : font_table[glyph_offset + 3];
+
+		if (text[i] == '\n' || (line_advance + glyph_advance) > WIDTH) {
+			++line;
+
+			if (line >= (HEIGHT / LINE_HEIGHT + 1)) {
+				break;
+			}
+
+			lines[line].index = text[i] == '\n' ? i + 1 : i;
+			lines[line].advance = 0;
+			lines[line].remaining = 0;
+
+			line_advance = 0;
+
+			if (text[i] == '\n') {
+				continue;
+			}
+		}
+
+		lines[line].remaining += 1;
+		line_advance += text[i] == ' ' ? SPACE_ADVANCE : glyph_advance;
 	}
+}
+
+void render_text(const char* text) {
+	prepare_text(text);
 
 	send(0x10);
 	set_dc(1);
 	render_text_partial(text, 0);
 	set_dc(0);
 
-	lines[0].index = 0;
-	lines[0].advance = 0;
-	lines[0].remaining = 0;
-	for (int i = 0; text[i] != 0; ++i) {
-		lines[0].remaining += 1;
-	}
+	prepare_text(text);
 
 	send(0x13);
 	set_dc(1);
 	render_text_partial(text, 1);
 	set_dc(0);
 }
-
-#include <stdio.h>
 
 void render_text_partial(const char* text, const uint8_t buffer) {
 	for (int x = 0; x < WIDTH; ++x) {
@@ -58,15 +90,19 @@ void render_text_partial(const char* text, const uint8_t buffer) {
 				continue;
 			}
 
-            if (text[line->index] == ' ') {
+			if (text[line->index] == ' ') {
 				line->index += 1;
 				line->advance += SPACE_ADVANCE;
 				line->remaining -= 1;
-            }
+			}
+
+			char c = text[line->index];
+			if (c < '!' || c > '~') {
+				c = '?';
+			}
 
 			// Glyph proprieties
-			const uintptr_t glyph_offset =
-					offset_table[text[line->index] - '!'];
+			const uintptr_t glyph_offset = offset_table[c - '!'];
 			const uint8_t w = font_table[glyph_offset],
 						  h = font_table[glyph_offset + 1];
 			const uint8_t xoff = font_table[glyph_offset + 2];
