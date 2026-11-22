@@ -65,7 +65,7 @@ void prepare_text(const char* text) {
 
 			line_advance = 0;
 
-			if (text[i] == '\n') {
+			if (text[i] == '\n' || text[i] == ' ') {
 				continue;
 			}
 		}
@@ -110,10 +110,16 @@ void render_text_partial(const char* text, const uint8_t buffer) {
 				continue;
 			}
 
-			while (text[line->index] == ' ' || text[line->index] == '\n') {
+			while (line->remaining != 0 &&
+				   (text[line->index] == ' ' || text[line->index] == '\n')) {
 				line->index += 1;
 				line->advance += SPACE_ADVANCE;
 				line->remaining -= 1;
+			}
+
+			if (line->remaining == 0) {
+				send(0x00);
+				continue;
 			}
 
 			char c = text[line->index];
