@@ -46,6 +46,13 @@ int main() {
 }
 
 __attribute__((interrupt)) void EXTI0_IRQHandler(void) {
+	static int init = 0;
+	if (!init) {
+		init = 1;
+		EXTI->INTFR = 1 << 0;
+		return;
+	}
+
 	printf("\nFlip backwards\n");
 
 	flip_page(1);
@@ -54,6 +61,13 @@ __attribute__((interrupt)) void EXTI0_IRQHandler(void) {
 }
 
 __attribute__((interrupt)) void EXTI1_IRQHandler(void) {
+	static int init = 0;
+	if (!init) {
+		init = 1;
+		EXTI->INTFR = 1 << 1;
+		return;
+	}
+
 	printf("\nFlip forwards\n");
 
 	flip_page(0);
