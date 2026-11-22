@@ -35,6 +35,11 @@ void prepare_text(const char* text) {
 			c = '?';
 		}
 
+        if (text[i] == '\r') {
+            // \r means end of section
+            break;
+        }
+
 		const uintptr_t glyph_offset = offset_table[c - '!'];
 		const uint8_t glyph_advance =
 				text[i] == ' ' ? SPACE_ADVANCE : font_table[glyph_offset + 3];
@@ -46,7 +51,7 @@ void prepare_text(const char* text) {
 				break;
 			}
 
-			lines[line].index = text[i] == '\n' ? i + 1 : i;
+			lines[line].index = (text[i] == '\n' || text[i] == ' ') ? i + 1 : i;
 			lines[line].advance = 0;
 			lines[line].remaining = 0;
 

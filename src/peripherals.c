@@ -28,18 +28,22 @@ void init_peripherals(void) {
 	// SPI_BaudRatePrescaler_8 is within datasheet limits: 18MHz
 
 	// Button
-	funPinMode(BUTTON, GPIO_CFGLR_IN_FLOAT);
+	funPinMode(BUTTON_LEFT, GPIO_Speed_In | GPIO_CNF_IN_PUPD);
+	funPinMode(BUTTON_RIGHT, GPIO_Speed_In | GPIO_CNF_IN_PUPD);
+	funDigitalWrite(BUTTON_LEFT, 1);
+	funDigitalWrite(BUTTON_RIGHT, 1);
 
 	// Interrupt for button
-	AFIO->EXTICR[0] = 1 << 8;
+	AFIO->EXTICR[0] = (1 << 4) | (1 << 0);
 
-	// Falling edge
-	EXTI->RTENR &= ~(1 << 2);
-	EXTI->FTENR |= 1 << 2;
+	// Raising edge
+	EXTI->RTENR = (1 << 1) | (1 << 0);
+	EXTI->FTENR = 0;
 
-	NVIC_EnableIRQ(EXTI2_IRQn);
+	NVIC_EnableIRQ(EXTI0_IRQn);
+	NVIC_EnableIRQ(EXTI1_IRQn);
 
-	EXTI->INTENR |= 1 << 2;
+	EXTI->INTENR = (1 << 1) | (1 << 0);
 
 	wait_busy();
 }
@@ -79,4 +83,3 @@ void send_sequence(const uint8_t data[], const int length) {
 		i += data[i + 1] + 1;
 	}
 }
-

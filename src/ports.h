@@ -9,7 +9,8 @@
 #define CLK PA5
 #define MOSI PA7
 
-#define BUTTON PB2
+#define BUTTON_LEFT PB0
+#define BUTTON_RIGHT PB1
 
 #define REG_C 0x00
 #define REG_WW 0x01

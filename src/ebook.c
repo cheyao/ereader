@@ -3,6 +3,7 @@
 
 #include "eink.h"
 #include "lut-opt.h"
+#include "page.h"
 #include "peripherals.h"
 #include "ports.h"
 #include "renderer.h"
@@ -11,25 +12,27 @@
 // https://www.buydisplay.com/download/ic/UC8179.pdf
 
 // TODO: Normalize unicode
-const static char text[] =
-		"And they were right to wonder. Right to suspect. But the truth was "
-		"that it was all a feint. The game. Tulm. Even Niers' question and his "
-		"gift to Umina, which he'd have to come up with. Oh, he always had his "
-		"game. And he always liked it to be fun. But this time, it had all "
-		"been to arrange one meeting. Such a casual one that while everyone "
-		"stared at Niers' grand plots and designs, they missed the little "
-		"trick, the moment hiding amid the grandeur.\n\nNiers laughed to "
-		"himself. He'd nearly started a war to arrange a meeting. Good thing "
-		"Tulm hadn't won. Anyways.\n\nThat was what you called a proper "
-		"distraction.";
-const static char text2[] = "It's nice to meet you :D ~~";
+const static char page[] =
+		"......................................................................"
+		"......................................................................"
+		"......................................................................"
+		"......................................................................"
+		"......................................................................"
+		"......................................................................"
+		"......................................................................"
+		"......................";
 
 int main() {
 	SystemInit();
 	funGpioInitAll();
 
 	init_peripherals();
-	init_eink();
+	// init_eink();
+
+    printf("Last page: %d", read_last_page());
+
+	while (1)
+		;
 
 	// The Eink screen is guarenteed to be blank rn
 
@@ -43,7 +46,7 @@ int main() {
 	load_lut_short(REG_WK, 0x40, 1);
 	load_lut_short(REG_KK, 0x00, 1);
 
-	render_text(text);
+	render_text(page);
 	refresh();
 
 	uint32_t end = funSysTick32();
@@ -52,6 +55,7 @@ int main() {
 
 	Delay_Ms(15000);
 
+	/*
 	start = funSysTick32();
 	load_lut_short(REG_C, 0x00, 0);
 	load_lut_short(REG_WW, 0x0A, 0);
@@ -70,6 +74,7 @@ int main() {
 
 	end = funSysTick32();
 	printf("Page advance took %ld/%d ticks\n", end - start, DELAY_SEC_COUNT(1));
+	*/
 
 	Delay_Ms(10000);
 
@@ -80,20 +85,16 @@ int main() {
 		;
 }
 
-__attribute__((interrupt)) void EXTI2_IRQHandler(void) {
-	EXTI->INTFR = 1 << 2;
-	printf("hi");
+__attribute__((interrupt)) void EXTI0_IRQHandler(void) {
+	EXTI->INTFR = 1 << 0;
+
+	printf("hi0");
+	Delay_Ms(50);
 }
 
-/*
-send(0x13);
-set_dc(1);
-for (int i = 0; i < HEIGHT * WIDTH / 8; ++i) {
-	if (i >= (HEIGHT * WIDTH / 8) / 4 * 1) {
-		send(0x00);
-	} else {
-		send(0xFF);
-	}
+__attribute__((interrupt)) void EXTI1_IRQHandler(void) {
+	EXTI->INTFR = 1 << 1;
+
+	printf("hi1");
+	Delay_Ms(50);
 }
-set_dc(0);
-*/
