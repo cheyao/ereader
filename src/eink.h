@@ -5,6 +5,7 @@
 
 void init_eink(void);
 void refresh(void);
+void refresh_no_wait(void);
 
 // LUT operations
 void setup_lut(const uint8_t LUT_SETTINGS[]);

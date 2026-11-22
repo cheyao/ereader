@@ -15,6 +15,7 @@ typedef struct Line {
 } Line;
 
 static Line lines[HEIGHT / LINE_HEIGHT + 1];
+uint32_t render_advance;
 
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 
@@ -27,22 +28,31 @@ void prepare_text(const char* text) {
 	lines[0].remaining = 0;
 
 	// TODO: SPACE in font table
-	for (int i = 0; text[i] != 0; ++i) {
+	int i = 0;
+	for (; text[i] != 0; ++i) {
 		char c = text[i];
 		if (c < '!' || c > '~') {
 			c = '?';
 		}
 
-        if (text[i] == '\r') {
-            // \r means end of section
-            break;
-        }
+		if (text[i] == '\r') {
+			// \r means end of section
+			break;
+		}
 
 		const uintptr_t glyph_offset = offset_table[c - '!'];
 		const uint8_t glyph_advance =
 				text[i] == ' ' ? SPACE_ADVANCE : font_table[glyph_offset + 3];
 
 		if (text[i] == '\n' || (line_advance + glyph_advance) > WIDTH) {
+			if (text[i] != '\n' && text[i] != ' ') {
+				do {
+					// Retreat to last spaace to break
+					lines[line].remaining -= 1;
+					i -= 1;
+				} while (text[i] != ' ' && text[i] != '\n');
+			}
+
 			++line;
 
 			if (line >= (HEIGHT / LINE_HEIGHT + 1)) {
@@ -62,6 +72,14 @@ void prepare_text(const char* text) {
 
 		lines[line].remaining += 1;
 		line_advance += text[i] == ' ' ? SPACE_ADVANCE : glyph_advance;
+	}
+
+	if (line >= HEIGHT / LINE_HEIGHT + 1) {
+		render_advance = lines[HEIGHT / LINE_HEIGHT].index;
+	} else if (text[i] == '\r')
+		render_advance = i + 1;
+	else {
+		render_advance = i;
 	}
 }
 
@@ -84,7 +102,6 @@ void render_text(const char* text) {
 void render_text_partial(const char* text, const uint8_t buffer) {
 	for (int x = 0; x < WIDTH; ++x) {
 		for (int y = 0; y < HEIGHT / 8; ++y) {
-			// FIXME: When line height isn't a mul of 8
 			const int line_num = y / (LINE_HEIGHT / 8);
 			Line* line = &lines[line_num];
 
@@ -93,7 +110,7 @@ void render_text_partial(const char* text, const uint8_t buffer) {
 				continue;
 			}
 
-			if (text[line->index] == ' ') {
+			while (text[line->index] == ' ' || text[line->index] == '\n') {
 				line->index += 1;
 				line->advance += SPACE_ADVANCE;
 				line->remaining -= 1;

@@ -57,9 +57,6 @@ void init_peripherals(void) {
 	EXTI->RTENR = (1 << 1) | (1 << 0);
 	EXTI->FTENR = 0;
 
-	NVIC_EnableIRQ(EXTI0_IRQn);
-	NVIC_EnableIRQ(EXTI1_IRQn);
-
 	EXTI->INTENR = (1 << 1) | (1 << 0);
 
 	wait_busy();

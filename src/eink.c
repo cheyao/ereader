@@ -76,6 +76,10 @@ void refresh(void) {
 	printf("Refreshed: %ld\n", end - start);
 }
 
+void refresh_no_wait(void) {
+	send(0x12);
+}
+
 void setup_lut(const uint8_t LUT_SETTINGS[]) {
 	// Frame rate
 	send(0x30);

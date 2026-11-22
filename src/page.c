@@ -4,10 +4,13 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "eink.h"
+#include "lut-opt.h"
 #include "peripherals.h"
 #include "ports.h"
+#include "renderer.h"
 
-char page[MAX_PAGE_SIZE];
+char page[MAX_PAGE_SIZE + 512];
 uint8_t sd_block_addr;
 
 static inline size_t last_page_addr(void) {
@@ -182,7 +185,116 @@ void sd_init(void) {
 	SPI1->CTLR1 |= CTLR1_SPE_Set;
 }
 
+int sd_read_block(uint32_t block, uint8_t* buf) {
+	uint32_t addr = sd_block_addr ? block : block * 512;
+	const uint8_t cmd17[] = {0x51,		addr >> 24, addr >> 16,
+							 addr >> 8, addr,		0x01};
+
+	sd_cs(0);
+	sd_send_seq(cmd17, 6);
+	if (sd_get_r1() != 0x00) {
+		sd_cs(1);
+		sd_xfer(0xFF);
+		return -1;
+	}
+
+	// Wait for data token 0xFE (card may take up to ~100 ms)
+	uint8_t t;
+	uint32_t start = funSysTick32();
+	while ((t = sd_xfer(0xFF)) == 0xFF &&
+		   funSysTick32() - start < Ticks_from_Ms(150))
+		;
+	if (t != 0xFE) {
+		sd_cs(1);
+		sd_xfer(0xFF);
+		return -2;
+	} // 0x0X = error token
+
+	for (int i = 0; i < 512; ++i)
+		buf[i] = sd_xfer(0xFF);
+	sd_xfer(0xFF);
+	sd_xfer(0xFF); // CRC, ignored
+
+	sd_cs(1);
+	sd_xfer(0xFF);
+	return 0;
+}
+
 void fetch_page(void) {
-	// TODO: MAX
 	uint32_t addr = read_last_page();
+	const uint32_t first = addr / 512;
+	const uint32_t skip = addr % 512;
+
+	for (int i = 0; i < MAX_PAGE_SIZE / 512; ++i) {
+		if (sd_read_block(first + i, (uint8_t*)page + (i + 1) * 512 - skip) !=
+			0) {
+			printf("SD read failed at block %lu\n", first + i);
+			break;
+		}
+	}
+
+	page[512 + 4 * 512 - skip + 1] = 0;
+}
+
+void flip_page(int backwards) {
+	uint32_t start = funSysTick32();
+
+	if (backwards) {
+		if (read_last_page() < 1536) {
+			write_last_page(0);
+		} else {
+			write_last_page(read_last_page() - 1536 * backwards);
+		}
+	} else {
+		write_last_page(read_last_page() + render_advance);
+	}
+
+	static int flips_since_refresh = 0;
+	if (flips_since_refresh >= 10) {
+		// Clear screen
+		load_lut(REG_C, INIT_LUT_C);
+		load_lut(REG_KW, INIT_LUT_KW);
+
+		send(0x10);
+		set_dc(1);
+		for (int i = 0; i < 800 * 480 / 8; ++i) {
+			send(0x00);
+		}
+		set_dc(0);
+
+		send(0x13);
+		set_dc(1);
+		for (int i = 0; i < 800 * 480 / 8; ++i) {
+			send(0xFF);
+		}
+		set_dc(0);
+
+		refresh();
+		printf("Completedly refreshed screen\n");
+
+		flips_since_refresh = 0;
+	} else {
+		++flips_since_refresh;
+	}
+
+	load_lut_short(REG_C, 0x00, 0);
+	load_lut_short(REG_WW, 0x0A, 0);
+	load_lut_short(REG_KW, 0x1A, 0);
+	load_lut_short(REG_WK, 0x5A, 0);
+	load_lut_short(REG_KK, 0x42, 0);
+	refresh_no_wait();
+	// Optimize timing a bit
+	fetch_page();
+	wait_busy();
+
+	load_lut_short(REG_C, 0x00, 1);
+	load_lut_short(REG_WW, 0x54, 1);
+	load_lut_short(REG_KW, 0x50, 1);
+	load_lut_short(REG_WK, 0x40, 1);
+	load_lut_short(REG_KK, 0x00, 1);
+	render_text(page + 512);
+	refresh();
+
+	uint32_t end = funSysTick32();
+	printf("Page advance took %ld/%d ticks\n", end - start, DELAY_SEC_COUNT(1));
 }
