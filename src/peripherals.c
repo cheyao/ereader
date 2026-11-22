@@ -15,15 +15,32 @@ void init_peripherals(void) {
 
 	funDigitalWrite(DC, 0);
 
+	funPinMode(SPI1_CS, GPIO_Speed_10MHz | GPIO_CNF_OUT_PP);
+	funPinMode(SPI1_CLK, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF);
+	funPinMode(SPI1_MISO, GPIO_Speed_In | GPIO_CNF_IN_PUPD);
+	funPinMode(SPI1_MOSI, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF);
+
+	funDigitalWrite(SPI1_CS, 1);
+	funDigitalWrite(SPI1_MISO, 1);
+
 	// Setup SPI
 	RCC->APB2PRSTR = RCC_SPI1RST;
 	RCC->APB2PRSTR = 0;
 	RCC->APB2PCENR |= RCC_APB2Periph_SPI1;
 
-	SPI1->CTLR2 = CTLR2_SSOE_Set;
+	RCC->APB1PRSTR = RCC_SPI2RST;
+	RCC->APB1PRSTR = 0;
+	RCC->APB1PCENR |= RCC_APB1Periph_SPI2;
+
+	SPI1->CTLR2 = 0;
 	SPI1->CTLR1 = SPI_DataSize_8b | SPI_FirstBit_MSB | SPI_CPHA_1Edge |
+				  SPI_CPOL_Low | SPI_Direction_2Lines_FullDuplex |
+				  SPI_Mode_Master | SPI_NSS_Soft | SPI_BaudRatePrescaler_256 |
+				  CTLR1_SPE_Set | SPI_CTLR1_SSI;
+	SPI2->CTLR2 = CTLR2_SSOE_Set;
+	SPI2->CTLR1 = SPI_DataSize_8b | SPI_FirstBit_MSB | SPI_CPHA_1Edge |
 				  SPI_CPOL_Low | SPI_Direction_1Line_Tx | SPI_Mode_Master |
-				  SPI_BaudRatePrescaler_8 | CTLR1_SPE_Set;
+				  SPI_NSS_Hard | SPI_BaudRatePrescaler_4 | CTLR1_SPE_Set;
 	// Max SPI_BaudRatePrescaler_4 aka 36MHz overclock
 	// SPI_BaudRatePrescaler_8 is within datasheet limits: 18MHz
 
@@ -49,27 +66,26 @@ void init_peripherals(void) {
 }
 
 void set_dc(const uint8_t dc) {
-	while (!(SPI1->STATR & SPI_STATR_TXE))
+	while (!(SPI2->STATR & SPI_STATR_TXE))
 		;
-	while (SPI1->STATR & SPI_STATR_BSY)
+	while (SPI2->STATR & SPI_STATR_BSY)
 		;
 	funDigitalWrite(DC, dc);
 }
 
 void wait_busy(void) {
-	while (!(SPI1->STATR & SPI_STATR_TXE))
+	while (!(SPI2->STATR & SPI_STATR_TXE))
 		;
-	while (SPI1->STATR & SPI_STATR_BSY)
+	while (SPI2->STATR & SPI_STATR_BSY)
 		;
-	// Delay_Ms(1);
 	while (!funDigitalRead(BUSY))
 		;
 }
 
 void send(const uint8_t data) {
-	while (!(SPI1->STATR & SPI_STATR_TXE))
+	while (!(SPI2->STATR & SPI_STATR_TXE))
 		;
-	SPI1->DATAR = data;
+	SPI2->DATAR = data;
 }
 
 void send_sequence(const uint8_t data[], const int length) {
@@ -82,4 +98,32 @@ void send_sequence(const uint8_t data[], const int length) {
 		set_dc(0);
 		i += data[i + 1] + 1;
 	}
+}
+
+void sd_cs(const uint8_t selected) {
+	while (SPI1->STATR & SPI_STATR_BSY)
+		;
+	funDigitalWrite(SPI1_CS, selected);
+}
+
+uint8_t sd_xfer(const uint8_t data) {
+	while (!(SPI1->STATR & SPI_STATR_TXE))
+		;
+	SPI1->DATAR = data;
+	while (!(SPI1->STATR & SPI_STATR_RXNE))
+		;
+	return SPI1->DATAR;
+}
+
+void sd_send_seq(const uint8_t* data, const uint8_t size) {
+	for (int i = 0; i < size; ++i) {
+		sd_xfer(data[i]);
+	}
+}
+
+uint8_t sd_get_r1(void) {
+	uint8_t r1;
+	for (int i = 0; i < 10 && ((r1 = sd_xfer(0xFF)) & 0x80); ++i)
+		;
+	return r1;
 }

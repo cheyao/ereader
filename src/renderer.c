@@ -14,7 +14,6 @@ typedef struct Line {
 	uint8_t remaining;
 } Line;
 
-// TODO: = 33.333
 static Line lines[HEIGHT / LINE_HEIGHT + 1];
 
 #define max(a, b) (((a) > (b)) ? (a) : (b))
@@ -27,7 +26,6 @@ void prepare_text(const char* text) {
 	lines[0].advance = 0;
 	lines[0].remaining = 0;
 
-	// TODO: +2?
 	// TODO: SPACE in font table
 	for (int i = 0; text[i] != 0; ++i) {
 		char c = text[i];

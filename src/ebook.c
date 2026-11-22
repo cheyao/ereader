@@ -11,30 +11,17 @@
 // For UC8179 IC
 // https://www.buydisplay.com/download/ic/UC8179.pdf
 
-// TODO: Normalize unicode
-const static char page[] =
-		"......................................................................"
-		"......................................................................"
-		"......................................................................"
-		"......................................................................"
-		"......................................................................"
-		"......................................................................"
-		"......................................................................"
-		"......................";
-
 int main() {
 	SystemInit();
 	funGpioInitAll();
 
 	init_peripherals();
 	// init_eink();
+	sd_init();
 
-    printf("Last page: %d", read_last_page());
-
+	fetch_page();
 	while (1)
 		;
-
-	// The Eink screen is guarenteed to be blank rn
 
 	Delay_Ms(1000);
 
@@ -88,13 +75,13 @@ int main() {
 __attribute__((interrupt)) void EXTI0_IRQHandler(void) {
 	EXTI->INTFR = 1 << 0;
 
-	printf("hi0");
+	printf("hi0\n");
 	Delay_Ms(50);
 }
 
 __attribute__((interrupt)) void EXTI1_IRQHandler(void) {
 	EXTI->INTFR = 1 << 1;
 
-	printf("hi1");
+	printf("hi1\n");
 	Delay_Ms(50);
 }

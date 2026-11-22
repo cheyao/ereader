@@ -2,15 +2,20 @@
 #define PORTS_H
 
 // Reset, dc, cs active low
-#define BUSY PA1
-#define RESET PA2
-#define DC PA3
-#define CS PA4
-#define CLK PA5
-#define MOSI PA7
+#define BUSY PA0
+#define RESET PA1
+#define DC PA2
+#define CS PB12
+#define CLK PB13
+#define MOSI PB15
 
 #define BUTTON_LEFT PB0
 #define BUTTON_RIGHT PB1
+
+#define SPI1_CS PA3
+#define SPI1_CLK PA5
+#define SPI1_MISO PA6
+#define SPI1_MOSI PA7
 
 #define REG_C 0x00
 #define REG_WW 0x01

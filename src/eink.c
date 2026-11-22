@@ -195,29 +195,29 @@ int8_t get_temperature(void) {
 	send(0x40);
 	set_dc(1);
 
-	(void)SPI1->DATAR;
+	(void)SPI2->DATAR;
 
-	SPI1->CTLR1 &= ~CTLR1_SPE_Set;
-	SPI1->CTLR1 &= ~SPI_CTLR1_BIDIOE;
-	SPI1->CTLR1 |= CTLR1_SPE_Set;
+	SPI2->CTLR1 &= ~CTLR1_SPE_Set;
+	SPI2->CTLR1 &= ~SPI_CTLR1_BIDIOE;
+	SPI2->CTLR1 |= CTLR1_SPE_Set;
 
 	uint8_t buf[2];
 
 	__disable_irq();
 	for (int i = 0; i < 2 - 1; ++i) {
-		while (!(SPI1->STATR & SPI_STATR_RXNE))
+		while (!(SPI2->STATR & SPI_STATR_RXNE))
 			;
-		buf[i] = SPI1->DATAR;
+		buf[i] = SPI2->DATAR;
 	}
 	// Clear last value
-	SPI1->CTLR1 &= ~CTLR1_SPE_Set;
-	while (!(SPI1->STATR & SPI_STATR_RXNE))
+	SPI2->CTLR1 &= ~CTLR1_SPE_Set;
+	while (!(SPI2->STATR & SPI_STATR_RXNE))
 		;
-	buf[1] = SPI1->DATAR;
+	buf[1] = SPI2->DATAR;
 	__enable_irq();
 
-	SPI1->CTLR1 |= SPI_CTLR1_BIDIOE;
-	SPI1->CTLR1 |= CTLR1_SPE_Set;
+	SPI2->CTLR1 |= SPI_CTLR1_BIDIOE;
+	SPI2->CTLR1 |= CTLR1_SPE_Set;
 
 	set_dc(0);
 
