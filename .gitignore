@@ -4,6 +4,7 @@
 *.elf
 *.hex
 *.o
+data.txt
 *.lst
 *.bin
 *.map
