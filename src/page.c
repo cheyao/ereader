@@ -10,8 +10,12 @@
 #include "ports.h"
 #include "renderer.h"
 
-char page[MAX_PAGE_SIZE + 512];
+char page[MAX_PAGE_SIZE + 512 + 1];
 uint8_t sd_block_addr;
+
+#define HISTORY_LEN 16
+static uint32_t history[HISTORY_LEN];
+static uint8_t history_len, history_pos;
 
 static inline size_t last_page_addr(void) {
 	return FLASH_BASE_ADDR + (uint32_t)ESIG_FLASH_KB * 1024u - FAST_PAGE_SIZE;
@@ -93,7 +97,11 @@ uint32_t read_last_page(void) {
 	return *(--addr);
 }
 
-void sd_init(void) {
+int sd_init(void) {
+	// SD Init must run below 144 MHz
+	const uint32_t cfgr = RCC->CFGR0;
+	RCC->CFGR0 = (cfgr & ~RCC_PPRE2) | RCC_PPRE2_DIV2;
+
 	// Wake up clocks
 	sd_cs(1);
 	funPinMode(SPI1_CLK, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP);
@@ -130,6 +138,8 @@ void sd_init(void) {
 
 	if (r7[2] != 0x01 || r7[3] != 0xAA) {
 		printf("SD Card Initialization failed: 0x1AA mismatch\n");
+		RCC->CFGR0 = cfgr;
+		return -1;
 	}
 
 	// ACMD41 Init card
@@ -150,6 +160,8 @@ void sd_init(void) {
 
 	if (r1 != 0x00) {
 		printf("SD Card Initialization failed: %x\n", r1);
+		RCC->CFGR0 = cfgr;
+		return -1;
 	}
 
 	// CMD58 read OCR
@@ -179,10 +191,13 @@ void sd_init(void) {
 	// Increase clk speed
 	while (SPI1->STATR & SPI_STATR_BSY)
 		;
+	RCC->CFGR0 = cfgr;
 	SPI1->CTLR1 &= ~CTLR1_SPE_Set;
 	SPI1->CTLR1 = (SPI1->CTLR1 & ~SPI_BaudRatePrescaler_256) |
 				  SPI_BaudRatePrescaler_8;
 	SPI1->CTLR1 |= CTLR1_SPE_Set;
+
+	return 0;
 }
 
 int sd_read_block(uint32_t block, uint8_t* buf) {
@@ -220,34 +235,80 @@ int sd_read_block(uint32_t block, uint8_t* buf) {
 	return 0;
 }
 
-void fetch_page(void) {
-	uint32_t addr = read_last_page();
+int fetch_page(const uint32_t addr) {
 	const uint32_t first = addr / 512;
 	const uint32_t skip = addr % 512;
 
 	for (int i = 0; i < MAX_PAGE_SIZE / 512; ++i) {
-		if (sd_read_block(first + i, (uint8_t*)page + (i + 1) * 512 - skip) !=
+		if (sd_read_block(first + i, (uint8_t*)page + (i + 1) * 512 - skip) ==
 			0) {
-			printf("SD read failed at block %lu\n", first + i);
-			break;
+			continue;
+		}
+		printf("Try 1: SD read failed at block %lu\n", first + i);
+
+		if (sd_read_block(first + i, (uint8_t*)page + (i + 1) * 512 - skip) ==
+			0) {
+			continue;
+		}
+
+		printf("Try 2: SD read failed at block %lu\n", first + i);
+		printf("Aborting\n");
+
+		if (i == 0) {
+			return -1;
+		} else {
+			page[512 + i * 512 - skip] = 0;
+			return 0;
 		}
 	}
 
-	page[512 + 4 * 512 - skip + 1] = 0;
+	page[512 + 6 * 512 - skip] = 0;
+	return 0;
 }
 
 void flip_page(int backwards) {
 	uint32_t start = funSysTick32();
 
+	const uint32_t cur = read_last_page();
+	uint32_t next;
 	if (backwards) {
-		if (read_last_page() < 1536) {
-			write_last_page(0);
-		} else {
-			write_last_page(read_last_page() - 1536 * backwards);
+		next = history_len
+					   ? history[(history_pos + HISTORY_LEN - 1) % HISTORY_LEN]
+					   : (cur < 1536 ? 0 : cur - 1536);
+	} else {
+		if (render_advance == 0) {
+			return;
+		}
+
+		next = cur + render_advance;
+	}
+
+	// TODO: Put this with the refresh to save time?
+	if (fetch_page(next) != 0) {
+		return;
+	}
+	if (backwards) {
+		if (history_len) {
+			// Dec pos by 1
+			history_pos = (history_pos + HISTORY_LEN - 1) % HISTORY_LEN;
+			--history_len;
 		}
 	} else {
-		write_last_page(read_last_page() + render_advance);
+		history[history_pos] = cur;
+		history_pos = (history_pos + 1) % HISTORY_LEN;
+		if (history_len < HISTORY_LEN) {
+			++history_len;
+		}
 	}
+	write_last_page(next);
+
+	// Do this even when we do full refresh to balance bw
+	load_lut_short(REG_C, 0x00, 0);
+	load_lut_short(REG_WW, 0x0A, 0);
+	load_lut_short(REG_KW, 0x1A, 0);
+	load_lut_short(REG_WK, 0x5A, 0);
+	load_lut_short(REG_KK, 0x42, 0);
+	refresh();
 
 	static int flips_since_refresh = 0;
 	if (flips_since_refresh >= 10) {
@@ -276,16 +337,6 @@ void flip_page(int backwards) {
 	} else {
 		++flips_since_refresh;
 	}
-
-	load_lut_short(REG_C, 0x00, 0);
-	load_lut_short(REG_WW, 0x0A, 0);
-	load_lut_short(REG_KW, 0x1A, 0);
-	load_lut_short(REG_WK, 0x5A, 0);
-	load_lut_short(REG_KK, 0x42, 0);
-	refresh_no_wait();
-	// Optimize timing a bit
-	fetch_page();
-	wait_busy();
 
 	load_lut_short(REG_C, 0x00, 1);
 	load_lut_short(REG_WW, 0x54, 1);

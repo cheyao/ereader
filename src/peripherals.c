@@ -53,9 +53,9 @@ void init_peripherals(void) {
 	// Interrupt for button
 	AFIO->EXTICR[0] = (1 << 4) | (1 << 0);
 
-	// Raising edge
-	EXTI->RTENR = (1 << 1) | (1 << 0);
-	EXTI->FTENR = 0;
+	// Falling edge
+	EXTI->RTENR = 0;
+	EXTI->FTENR = (1 << 1) | (1 << 0);
 
 	EXTI->INTENR = (1 << 1) | (1 << 0);
 
@@ -75,6 +75,7 @@ void wait_busy(void) {
 		;
 	while (SPI2->STATR & SPI_STATR_BSY)
 		;
+    Delay_Us(50);
 	while (!funDigitalRead(BUSY))
 		;
 }

@@ -23,9 +23,9 @@ void prepare_text(const char* text) {
 	int line = 0;
 	int line_advance = 0;
 
-	lines[0].index = 0;
-	lines[0].advance = 0;
-	lines[0].remaining = 0;
+	for (int i = 0; i < HEIGHT / LINE_HEIGHT + 1; ++i) {
+		lines[i] = (Line){0};
+	}
 
 	// TODO: SPACE in font table
 	int i = 0;
@@ -46,11 +46,16 @@ void prepare_text(const char* text) {
 
 		if (text[i] == '\n' || (line_advance + glyph_advance) > WIDTH) {
 			if (text[i] != '\n' && text[i] != ' ') {
-				do {
-					// Retreat to last spaace to break
-					lines[line].remaining -= 1;
-					i -= 1;
-				} while (text[i] != ' ' && text[i] != '\n');
+				int j = i - 1;
+				while (j >= lines[line].index && text[j] != ' ') {
+					--j;
+				}
+
+				// Prevent underflows
+				if (j >= lines[line].index) {
+					lines[line].remaining -= i - j;
+					i = j;
+				}
 			}
 
 			++line;
@@ -103,6 +108,12 @@ void render_text_partial(const char* text, const uint8_t buffer) {
 	for (int x = 0; x < WIDTH; ++x) {
 		for (int y = 0; y < HEIGHT / 8; ++y) {
 			const int line_num = y / (LINE_HEIGHT / 8);
+
+			if (line_num >= HEIGHT / LINE_HEIGHT) {
+				send(0x00);
+				continue;
+			}
+
 			Line* line = &lines[line_num];
 
 			if (line->remaining == 0) {

@@ -65,8 +65,10 @@ int main() {
 
 		uint8_t yoff_real = std::max(0, (int)lroundf(yoff + baseline_y));
 
+		const int adv =
+				std::max((int)lroundf(advance * scale), w + std::max(xoff, 0));
 		printf("0x%02X, 0x%02X, 0x%02X, 0x%02X,\n    ", w, h + yoff_real,
-			   (uint8_t)std::max(xoff, 0), (int)lroundf(advance * scale));
+			   (uint8_t)std::max(xoff, 0), adv);
 
 		index += 4;
 

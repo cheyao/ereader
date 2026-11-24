@@ -11,15 +11,34 @@
 // For UC8179 IC
 // https://www.buydisplay.com/download/ic/UC8179.pdf
 
+static volatile uint8_t pressed;
+
 int main() {
 	SystemInit();
 	funGpioInitAll();
 
+	printf("Booting with offset %lu\n", read_last_page());
+
 	init_peripherals();
 	init_eink();
-	sd_init();
+	// TODO: Print to eink screen?
+	if (sd_init() != 0) {
+		printf("SD Init Failed\n");
+		while (1)
+			;
+	}
 
-	fetch_page();
+	int retry_times = 3;
+	while (fetch_page(read_last_page()) != 0 && retry_times > 0) {
+		--retry_times;
+		Delay_Ms(1000);
+	}
+
+	if (retry_times == 0) {
+		printf("Boot page read failed at offset %lu\n", read_last_page());
+		while (1)
+			;
+	}
 
 	// Black
 	uint32_t start = funSysTick32();
@@ -38,39 +57,34 @@ int main() {
 
 	// Start button interrupts
 	EXTI->INTFR = (1 << 1) | (1 << 0);
+	NVIC_ClearPendingIRQ(EXTI0_IRQn);
+	NVIC_ClearPendingIRQ(EXTI1_IRQn);
 	NVIC_EnableIRQ(EXTI0_IRQn);
 	NVIC_EnableIRQ(EXTI1_IRQn);
 
-	while (1)
-		;
+	while (1) {
+		if (!pressed) {
+			Delay_Ms(10);
+			continue;
+		}
+
+		Delay_Ms(20);
+
+		if (pressed & 0b01 && !funDigitalRead(BUTTON_LEFT)) {
+			flip_page(1);
+		} else if (pressed & 0b10 && !funDigitalRead(BUTTON_RIGHT)) {
+			flip_page(0);
+		}
+		pressed = 0;
+	}
 }
 
 __attribute__((interrupt)) void EXTI0_IRQHandler(void) {
-	static int init = 0;
-	if (!init) {
-		init = 1;
-		EXTI->INTFR = 1 << 0;
-		return;
-	}
-
-	printf("\nFlip backwards\n");
-
-	flip_page(1);
-
 	EXTI->INTFR = 1 << 0;
+	pressed |= 1 << 0;
 }
 
 __attribute__((interrupt)) void EXTI1_IRQHandler(void) {
-	static int init = 0;
-	if (!init) {
-		init = 1;
-		EXTI->INTFR = 1 << 1;
-		return;
-	}
-
-	printf("\nFlip forwards\n");
-
-	flip_page(0);
-
 	EXTI->INTFR = 1 << 1;
+	pressed |= 1 << 1;
 }
