@@ -104,8 +104,8 @@ int sd_init(void) {
 
 	// Wake up clocks
 	sd_cs(1);
-	funPinMode(SPI1_CLK, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP);
-	funPinMode(SPI1_MOSI, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP);
+	funPinMode(SPI1_CLK, GPIO_Speed_50MHz | GPIO_CNF_OUT_PP);
+	funPinMode(SPI1_MOSI, GPIO_Speed_50MHz | GPIO_CNF_OUT_PP);
 	funDigitalWrite(SPI1_MOSI, 1);
 	for (int i = 0; i < 80; ++i) {
 		funDigitalWrite(SPI1_CLK, 1);
@@ -113,8 +113,8 @@ int sd_init(void) {
 		funDigitalWrite(SPI1_CLK, 0);
 		Delay_Us(1);
 	}
-	funPinMode(SPI1_CLK, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF);
-	funPinMode(SPI1_MOSI, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF);
+	funPinMode(SPI1_CLK, GPIO_Speed_50MHz | GPIO_CNF_OUT_PP_AF);
+	funPinMode(SPI1_MOSI, GPIO_Speed_50MHz | GPIO_CNF_OUT_PP_AF);
 
 	// CMD0 sw reset
 	const uint8_t cmd0[] = {0x40, 0, 0, 0, 0, 0x95};
@@ -225,8 +225,9 @@ int sd_read_block(uint32_t block, uint8_t* buf) {
 		return -2;
 	} // 0x0X = error token
 
-	for (int i = 0; i < 512; ++i)
+	for (int i = 0; i < 512; ++i) {
 		buf[i] = sd_xfer(0xFF);
+	}
 	sd_xfer(0xFF);
 	sd_xfer(0xFF); // CRC, ignored
 
@@ -240,14 +241,18 @@ int fetch_page(const uint32_t addr) {
 	const uint32_t skip = addr % 512;
 
 	for (int i = 0; i < MAX_PAGE_SIZE / 512; ++i) {
-		if (sd_read_block(first + i, (uint8_t*)page + (i + 1) * 512 - skip) ==
-			0) {
+		uint8_t* dst = (uint8_t*)page + (i + 1) * 512 - skip;
+
+		const int err = sd_read_block(first + i, dst);
+		if (err == 0) {
 			continue;
 		}
-		printf("Try 1: SD read failed at block %lu\n", first + i);
+		// -1: command rejected, -2: no data token within the timeout
+		printf("Try 1: SD read failed at block %lu (err %d)\n", first + i, err);
 
-		if (sd_read_block(first + i, (uint8_t*)page + (i + 1) * 512 - skip) ==
-			0) {
+		// A failed read can leave the card stuck mid-transfer, answering
+		// every later command with garbage: reset it before retrying
+		if (sd_init() == 0 && sd_read_block(first + i, dst) == 0) {
 			continue;
 		}
 

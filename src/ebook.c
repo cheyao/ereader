@@ -21,7 +21,6 @@ int main() {
 
 	init_peripherals();
 	init_eink();
-	// TODO: Print to eink screen?
 	if (sd_init() != 0) {
 		printf("SD Init Failed\n");
 		while (1)
@@ -39,6 +38,8 @@ int main() {
 		while (1)
 			;
 	}
+
+	printf("Rendering pages now\n");
 
 	// Black
 	uint32_t start = funSysTick32();

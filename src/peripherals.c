@@ -2,23 +2,24 @@
 
 #include <ch32fun.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "ports.h"
 
 void init_peripherals(void) {
 	funPinMode(BUSY, GPIO_Speed_In | GPIO_CNF_IN_FLOATING);
-	funPinMode(RESET, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP);
-	funPinMode(DC, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP);
-	funPinMode(CS, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF);
-	funPinMode(CLK, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF);
-	funPinMode(MOSI, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF);
+	funPinMode(RESET, GPIO_Speed_50MHz | GPIO_CNF_OUT_PP);
+	funPinMode(DC, GPIO_Speed_50MHz | GPIO_CNF_OUT_PP);
+	funPinMode(CS, GPIO_Speed_50MHz | GPIO_CNF_OUT_PP_AF);
+	funPinMode(CLK, GPIO_Speed_50MHz | GPIO_CNF_OUT_PP_AF);
+	funPinMode(MOSI, GPIO_Speed_50MHz | GPIO_CNF_OUT_PP_AF);
 
 	funDigitalWrite(DC, 0);
 
-	funPinMode(SPI1_CS, GPIO_Speed_10MHz | GPIO_CNF_OUT_PP);
-	funPinMode(SPI1_CLK, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF);
+	funPinMode(SPI1_CS, GPIO_Speed_50MHz | GPIO_CNF_OUT_PP);
+	funPinMode(SPI1_CLK, GPIO_Speed_50MHz | GPIO_CNF_OUT_PP_AF);
 	funPinMode(SPI1_MISO, GPIO_Speed_In | GPIO_CNF_IN_PUPD);
-	funPinMode(SPI1_MOSI, GPIO_Speed_2MHz | GPIO_CNF_OUT_PP_AF);
+	funPinMode(SPI1_MOSI, GPIO_Speed_50MHz | GPIO_CNF_OUT_PP_AF);
 
 	funDigitalWrite(SPI1_CS, 1);
 	funDigitalWrite(SPI1_MISO, 1);
@@ -75,7 +76,7 @@ void wait_busy(void) {
 		;
 	while (SPI2->STATR & SPI_STATR_BSY)
 		;
-    Delay_Us(50);
+	Delay_Us(50);
 	while (!funDigitalRead(BUSY))
 		;
 }
