@@ -9,7 +9,8 @@ void refresh_no_wait(void);
 
 // LUT operations
 void setup_lut(const uint8_t LUT_SETTINGS[]);
-void load_lut_short(const uint8_t bank, const uint8_t data, bool wtb);
+void load_draw_luts(void);
+void load_clear_luts(void);
 void load_lut(const uint8_t bank, const uint8_t data[]);
 
 // Misc

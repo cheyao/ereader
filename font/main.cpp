@@ -10,7 +10,21 @@ extern "C" {
 #include "rawdraw_sf.h"
 }
 
-uint8_t map(uint8_t color) { return (color + 42) / 85 * 85; }
+// Quantize coverage to 4 levels, biased dark ("stem darkening"): at 24px most
+// stems are only partly covered, so >= 50% coverage becomes full black and
+// faint edge pixels are kept as light gray instead of being dropped.
+uint8_t map(uint8_t color) {
+	if (color >= 128) {
+		return 255;
+	}
+	if (color >= 64) {
+		return 170;
+	}
+	if (color >= 24) {
+		return 85;
+	}
+	return 0;
+}
 
 int main() {
 	std::ifstream file("ttf/OpenSans-Regular.ttf", std::ios::binary);

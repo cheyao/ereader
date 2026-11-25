@@ -4,13 +4,28 @@
 #define FRAMES_BLACK 0x0F
 #define FRAMES_DGRAY 0x06
 #define FRAMES_LGRAY 0x07
+// Extra black frames for full-black pixels only (draw phase 3, WW LUT).
+// Tune 0..20: use the smallest value where black stops getting darker.
+#define FRAMES_BLACK_EXTRA 0x0A
+
+// Total black drive each gray level receives in the draw pass
+#define DRIVE_BLACK                                                            \
+	(FRAMES_LGRAY + FRAMES_DGRAY + FRAMES_BLACK + FRAMES_BLACK_EXTRA)
+#define DRIVE_DGRAY (FRAMES_LGRAY + FRAMES_DGRAY)
+#define DRIVE_LGRAY (FRAMES_LGRAY)
+
+// Clear pass: 1 = DC-balanced (undo exactly the draw drive, shorter),
+//             0 = previous over-driven clear (more white, less ghosting)
+#define BALANCED_CLEAR 1
+// Balanced clear: short black kick so every pixel starts from the same state
+#define FRAMES_SHAKE 0x04
 
 // Enough pixels to drive black to white
-#define WHITE_OFFSET 0x2A - FRAMES_BLACK
+#define WHITE_OFFSET (0x2A - FRAMES_BLACK)
 
 // White -> Color delay LUTs
 const static uint8_t LUT_WB_DELAYS[] = {FRAMES_LGRAY, FRAMES_DGRAY,
-										FRAMES_BLACK, 0x00, 0x01};
+										FRAMES_BLACK, FRAMES_BLACK_EXTRA, 0x01};
 const static uint8_t LUT_BW_DELAYS[] = {FRAMES_DGRAY, FRAMES_BLACK,
 										WHITE_OFFSET, FRAMES_BLACK, 0x01};
 

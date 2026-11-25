@@ -303,11 +303,7 @@ void flip_page(int backwards) {
 	write_last_page(next);
 
 	// Do this even when we do full refresh to balance bw
-	load_lut_short(REG_C, 0x00, 0);
-	load_lut_short(REG_WW, 0x0A, 0);
-	load_lut_short(REG_KW, 0x1A, 0);
-	load_lut_short(REG_WK, 0x5A, 0);
-	load_lut_short(REG_KK, 0x42, 0);
+	load_clear_luts();
 	refresh();
 
 	static int flips_since_refresh = 0;
@@ -338,11 +334,7 @@ void flip_page(int backwards) {
 		++flips_since_refresh;
 	}
 
-	load_lut_short(REG_C, 0x00, 1);
-	load_lut_short(REG_WW, 0x54, 1);
-	load_lut_short(REG_KW, 0x50, 1);
-	load_lut_short(REG_WK, 0x40, 1);
-	load_lut_short(REG_KK, 0x00, 1);
+	load_draw_luts();
 	render_text(page + 512);
 	refresh();
 

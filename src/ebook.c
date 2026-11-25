@@ -42,11 +42,7 @@ int main() {
 
 	// Black
 	uint32_t start = funSysTick32();
-	load_lut_short(REG_C, 0x00, 1);
-	load_lut_short(REG_WW, 0x54, 1);
-	load_lut_short(REG_KW, 0x50, 1);
-	load_lut_short(REG_WK, 0x40, 1);
-	load_lut_short(REG_KK, 0x00, 1);
+	load_draw_luts();
 
 	render_text(page + 512);
 	refresh();

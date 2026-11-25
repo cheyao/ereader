@@ -8,11 +8,13 @@
 #include "peripherals.h"
 #include "ports.h"
 
-// TODO: 0x06 soft start
 const static uint8_t Eink_Init_Code[] = {
 		// Commands to initialize eink
 		// Panel Settings: Reg LUT, BW mode, Scan up, Shift right, Booster on
 		0x00, 1, 0x37,
+		// Booster soft start / drive strength (Good Display reference values)
+		// Stronger booster keeps VDH/VDL from sagging on dense pages
+		0x06, 4, 0x17, 0x17, 0x28, 0x17,
 		// PLL Clock Frequency
 		0x30, 1, 0x06,
 		// VCOM and DATA Interval Setting
@@ -143,12 +145,15 @@ void setup_lut(const uint8_t LUT_SETTINGS[]) {
 	wait_busy();
 }
 
-void load_lut_short(const uint8_t bank, const uint8_t data, bool wtb) {
+// One LUT group: 4 phase levels (2 bits each, phase 0 in bits 7:6),
+// 4 phase frame counts and a repeat count. Remaining groups are zeroed.
+static void load_lut_group(const uint8_t bank, const uint8_t levels,
+						   const uint8_t frames[5]) {
 	send(bank + 0x20);
 	set_dc(1);
-	send(data);
+	send(levels);
 	for (int j = 0; j < 5; ++j) {
-		send(wtb ? LUT_WB_DELAYS[j] : LUT_BW_DELAYS[j]);
+		send(frames[j]);
 	}
 
 	for (int j = 0; j < 36; ++j) {
@@ -161,6 +166,39 @@ void load_lut_short(const uint8_t bank, const uint8_t data, bool wtb) {
 		}
 	}
 	set_dc(0);
+}
+
+// Level bytes: 00 = hold, 01 = drive black, 10 = drive white
+void load_draw_luts(void) {
+	load_lut_group(REG_C, 0x00, LUT_WB_DELAYS);
+	load_lut_group(REG_WW, 0x55, LUT_WB_DELAYS); // Black: all 4 phases
+	load_lut_group(REG_KW, 0x50, LUT_WB_DELAYS); // Dark gray: phases 0-1
+	load_lut_group(REG_WK, 0x40, LUT_WB_DELAYS); // Light gray: phase 0
+	load_lut_group(REG_KK, 0x00, LUT_WB_DELAYS); // White: hold
+}
+
+void load_clear_luts(void) {
+#if BALANCED_CLEAR
+	// Phase 0: short black kick, phase 1: white for exactly the black drive
+	// the pixel got when drawn, plus the kick. Net drive per flip is 0.
+	const uint8_t black[5] = {FRAMES_SHAKE, DRIVE_BLACK + FRAMES_SHAKE, 0, 0, 1};
+	const uint8_t dgray[5] = {FRAMES_SHAKE, DRIVE_DGRAY + FRAMES_SHAKE, 0, 0, 1};
+	const uint8_t lgray[5] = {FRAMES_SHAKE, DRIVE_LGRAY + FRAMES_SHAKE, 0, 0, 1};
+	const uint8_t white[5] = {FRAMES_SHAKE, FRAMES_SHAKE, 0, 0, 1};
+
+	// VCOM LUT spans the longest pixel LUT
+	load_lut_group(REG_C, 0x00, black);
+	load_lut_group(REG_WW, 0x60, black);
+	load_lut_group(REG_KW, 0x60, dgray);
+	load_lut_group(REG_WK, 0x60, lgray);
+	load_lut_group(REG_KK, 0x60, white);
+#else
+	load_lut_group(REG_C, 0x00, LUT_BW_DELAYS);
+	load_lut_group(REG_WW, 0x0A, LUT_BW_DELAYS);
+	load_lut_group(REG_KW, 0x1A, LUT_BW_DELAYS);
+	load_lut_group(REG_WK, 0x5A, LUT_BW_DELAYS);
+	load_lut_group(REG_KK, 0x42, LUT_BW_DELAYS);
+#endif
 }
 
 void load_lut(const uint8_t bank, const uint8_t data[]) {
