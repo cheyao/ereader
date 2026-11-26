@@ -17,8 +17,8 @@
 // Clear pass: 1 = DC-balanced (undo exactly the draw drive, shorter),
 //             0 = previous over-driven clear (more white, less ghosting)
 #define BALANCED_CLEAR 1
-// Balanced clear: short black kick so every pixel starts from the same state
 #define FRAMES_SHAKE 0x04
+#define FRAMES_WHITE_MARGIN 0x05
 
 // Enough pixels to drive black to white
 #define WHITE_OFFSET (0x2A - FRAMES_BLACK)

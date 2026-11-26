@@ -179,12 +179,15 @@ void load_draw_luts(void) {
 
 void load_clear_luts(void) {
 #if BALANCED_CLEAR
-	// Phase 0: short black kick, phase 1: white for exactly the black drive
-	// the pixel got when drawn, plus the kick. Net drive per flip is 0.
-	const uint8_t black[5] = {FRAMES_SHAKE, DRIVE_BLACK + FRAMES_SHAKE, 0, 0, 1};
-	const uint8_t dgray[5] = {FRAMES_SHAKE, DRIVE_DGRAY + FRAMES_SHAKE, 0, 0, 1};
-	const uint8_t lgray[5] = {FRAMES_SHAKE, DRIVE_LGRAY + FRAMES_SHAKE, 0, 0, 1};
-	const uint8_t white[5] = {FRAMES_SHAKE, FRAMES_SHAKE, 0, 0, 1};
+	// Phase 0: short black kick, phase 1: white for the black drive the pixel
+	// got when drawn, plus the kick, plus a small white margin. Net drive per
+	// flip is FRAMES_WHITE_MARGIN toward white.
+#define CLEAR_WHITE(drive) ((drive) + FRAMES_SHAKE + FRAMES_WHITE_MARGIN)
+	const uint8_t black[5] = {FRAMES_SHAKE, CLEAR_WHITE(DRIVE_BLACK), 0, 0, 1};
+	const uint8_t dgray[5] = {FRAMES_SHAKE, CLEAR_WHITE(DRIVE_DGRAY), 0, 0, 1};
+	const uint8_t lgray[5] = {FRAMES_SHAKE, CLEAR_WHITE(DRIVE_LGRAY), 0, 0, 1};
+	const uint8_t white[5] = {FRAMES_SHAKE, CLEAR_WHITE(0), 0, 0, 1};
+#undef CLEAR_WHITE
 
 	// VCOM LUT spans the longest pixel LUT
 	load_lut_group(REG_C, 0x00, black);
