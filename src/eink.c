@@ -41,8 +41,8 @@ void init_eink(void) {
 
 	setup_lut(DEFAULT_LUT_SETTINGS);
 
-	load_lut(REG_C, INIT_LUT_C);
-	load_lut(REG_KW, INIT_LUT_KW);
+	load_lut(REG_C, BOOT_CLEAR_LUT_C);
+	load_lut(REG_KW, BOOT_CLEAR_LUT_KW);
 
 	// Clear screen
 	send(0x10);
@@ -211,7 +211,8 @@ void load_lut(const uint8_t bank, const uint8_t data[]) {
 		send(data == 0 ? 0 : data[j]);
 	}
 
-	if (bank != REG_WW) {
+	// WW and border LUTs are 42 bytes, the others 60
+	if (bank != REG_WW && bank != REG_BD) {
 		for (int j = 0; j < 18; ++j) {
 			send(0);
 		}

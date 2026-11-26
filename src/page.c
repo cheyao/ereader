@@ -312,10 +312,19 @@ void flip_page(int backwards) {
 	refresh();
 
 	static int flips_since_refresh = 0;
-	if (flips_since_refresh >= 10) {
+	if (flips_since_refresh >= FLIPS_PER_FULL_CLEAR - 1) {
 		// Clear screen
-		load_lut(REG_C, INIT_LUT_C);
-		load_lut(REG_KW, INIT_LUT_KW);
+		load_lut(REG_C, FULL_CLEAR_LUT_C);
+		load_lut(REG_KW, FULL_CLEAR_LUT_KW);
+
+		// Drive the border with its own balanced LUT (BDV=11: LUTBD):
+		// floating, it drifts with the screen's long uniform drive
+		load_lut(REG_BD, BORDER_CLEAR_LUT);
+		send(0x50);
+		set_dc(1);
+		send(0x31);
+		send(0x03);
+		set_dc(0);
 
 		send(0x10);
 		set_dc(1);
@@ -333,6 +342,13 @@ void flip_page(int backwards) {
 
 		refresh();
 		printf("Completedly refreshed screen\n");
+
+		// Border back to floating
+		send(0x50);
+		set_dc(1);
+		send(0xA1);
+		send(0x03);
+		set_dc(0);
 
 		flips_since_refresh = 0;
 	} else {

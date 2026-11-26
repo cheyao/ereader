@@ -22,6 +22,7 @@
 #define REG_KW 0x02
 #define REG_WK 0x03
 #define REG_KK 0x04
+#define REG_BD 0x05
 
 // Decrease this to emulate a smaller screen
 #define HEIGHT 800
