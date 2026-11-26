@@ -29,14 +29,21 @@ void prepare_text(const char* text) {
 
 	// TODO: SPACE in font table
 	int i = 0;
+
+	// Remove preceding new lines or spaces
+	while (text[i] == '\n' || text[i] == ' ') {
+		++i;
+	}
+    lines[0].index = i;
+
 	for (; text[i] != 0; ++i) {
 		char c = text[i];
 		if (c < '!' || c > '~') {
 			c = '?';
 		}
 
+		// \r means end of section
 		if (text[i] == '\r') {
-			// \r means end of section
 			break;
 		}
 

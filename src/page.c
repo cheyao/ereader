@@ -164,7 +164,10 @@ int sd_init(void) {
 		r1 = sd_get_r1();
 		sd_cs(1);
 		sd_xfer(0xFF);
-	} while (r1 == 0x01 && funSysTick32() - start < Ticks_from_Ms(2000));
+		// SysTick->CNT is 64-bit: subtract in 32 bits, or the timeout expires
+		// instantly once the counter passes 2^32 (~4 min after boot)
+	} while (r1 == 0x01 &&
+			 (uint32_t)(funSysTick32() - start) < Ticks_from_Ms(2000));
 
 	if (r1 != 0x00) {
 		printf("SD Card Initialization failed: %x\n", r1);
@@ -223,17 +226,29 @@ int sd_read_block(uint32_t block, uint8_t* buf) {
 		return -1;
 	}
 
-	// Wait for data token 0xFE (card may take up to ~100 ms)
+	// Wait for data token 0xFE. Spec says up to 100 ms, but cards doing
+	// internal housekeeping can take longer
 	uint8_t t;
 	uint32_t start = funSysTick32();
+	// SysTick->CNT is 64-bit: subtract in 32 bits (see sd_init)
 	while ((t = sd_xfer(0xFF)) == 0xFF &&
-		   funSysTick32() - start < Ticks_from_Ms(150))
+		   (uint32_t)(funSysTick32() - start) < Ticks_from_Ms(500))
 		;
 	if (t != 0xFE) {
+		// 0xFF = timeout, 0x0X = card error token, else garbled
+		printf("SD token 0x%02x\n", t);
+
+		// Drain whatever the card still wants to send (block + CRC) before
+		// deselecting, so it isn't left stuck mid-transfer and ignoring the
+		// reset that follows
+		for (int i = 0; i < 1024; ++i) {
+			sd_xfer(0xFF);
+		}
+
 		sd_cs(1);
 		sd_xfer(0xFF);
 		return -2;
-	} // 0x0X = error token
+	}
 
 	for (int i = 0; i < 512; ++i) {
 		buf[i] = sd_xfer(0xFF);
