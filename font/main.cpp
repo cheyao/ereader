@@ -66,8 +66,15 @@ int main() {
 	printf("// clang-format off\n");
 
 	printf("const uint8_t font_table[] = {\n    ");
-	for (char c = '!'; c <= '~'; ++c) {
+	for (char ch = '!'; ch <= '~'; ++ch) {
+        int c = ch;
+
 		offsets.emplace_back(index);
+
+        if (c == '-') {
+            // Prefer em-dash for better formatting
+            c = U'—';
+        }
 
 		int w, h, xoff, yoff;
 		const auto bitmap = stbtt_GetCodepointBitmap(
