@@ -90,13 +90,26 @@ void prepare_text(const char* text) {
 
 void render_text(const char* text) {
 	prepare_text(text);
+	render_prepared(text);
+}
+
+// Sends both planes of a page already laid out by prepare_text().
+// render_text_partial() consumes lines[], so it's restored for plane 1
+// instead of laying the page out a second time.
+void render_prepared(const char* text) {
+	static Line saved[HEIGHT / LINE_HEIGHT + 1];
+	for (int i = 0; i < HEIGHT / LINE_HEIGHT + 1; ++i) {
+		saved[i] = lines[i];
+	}
 
 	send(0x10);
 	set_dc(1);
 	render_text_partial(text, 0);
 	set_dc(0);
 
-	prepare_text(text);
+	for (int i = 0; i < HEIGHT / LINE_HEIGHT + 1; ++i) {
+		lines[i] = saved[i];
+	}
 
 	send(0x13);
 	set_dc(1);

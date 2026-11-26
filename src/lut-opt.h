@@ -21,7 +21,7 @@
 #define FRAMES_WHITE_MARGIN 0x05
 
 // Full clear runs on every FLIPS_PER_FULL_CLEAR-th page turn
-#define FLIPS_PER_FULL_CLEAR 11
+#define FLIPS_PER_FULL_CLEAR 20
 // Full clear: white at the end, after the black/white shake. Raise if the
 // screen isn't fully white after a full clear.
 #define FULL_CLEAR_WHITE 100

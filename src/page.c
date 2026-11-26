@@ -98,9 +98,17 @@ uint32_t read_last_page(void) {
 }
 
 int sd_init(void) {
-	// SD Init must run below 144 MHz
+	// Identification must run at <= 400 kHz, also when re-initializing after
+	// a failed read (SPI1 is then still at the fast data rate)
+	while (SPI1->STATR & SPI_STATR_BSY)
+		;
+	SPI1->CTLR1 &= ~CTLR1_SPE_Set;
+
 	const uint32_t cfgr = RCC->CFGR0;
 	RCC->CFGR0 = (cfgr & ~RCC_PPRE2) | RCC_PPRE2_DIV2;
+
+	SPI1->CTLR1 |= SPI_BaudRatePrescaler_256; // All baud rate bits set: /256
+	SPI1->CTLR1 |= CTLR1_SPE_Set;
 
 	// Wake up clocks
 	sd_cs(1);
@@ -191,10 +199,12 @@ int sd_init(void) {
 	// Increase clk speed
 	while (SPI1->STATR & SPI_STATR_BSY)
 		;
-	RCC->CFGR0 = cfgr;
 	SPI1->CTLR1 &= ~CTLR1_SPE_Set;
+
+	RCC->CFGR0 = cfgr;
 	SPI1->CTLR1 = (SPI1->CTLR1 & ~SPI_BaudRatePrescaler_256) |
-				  SPI_BaudRatePrescaler_8;
+				  SPI_BaudRatePrescaler_16;
+
 	SPI1->CTLR1 |= CTLR1_SPE_Set;
 
 	return 0;
@@ -309,7 +319,14 @@ void flip_page(int backwards) {
 
 	// Do this even when we do full refresh to balance bw
 	load_clear_luts();
-	refresh();
+
+	// Lay out the new page while the panel clears (CPU only, no panel I/O)
+	const uint32_t clear_start = funSysTick32();
+	refresh_no_wait();
+	prepare_text(page + 512);
+	wait_busy();
+	const uint32_t clear_end = funSysTick32();
+	printf("Refreshed: %ld\n", clear_end - clear_start);
 
 	static int flips_since_refresh = 0;
 	if (flips_since_refresh >= FLIPS_PER_FULL_CLEAR - 1) {
@@ -356,7 +373,7 @@ void flip_page(int backwards) {
 	}
 
 	load_draw_luts();
-	render_text(page + 512);
+	render_prepared(page + 512); // Laid out during the clear pass
 	refresh();
 
 	uint32_t end = funSysTick32();
