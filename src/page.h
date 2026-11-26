@@ -18,7 +18,10 @@ uint32_t read_last_page(void);
 
 int sd_init(void);
 int sd_read_block(uint32_t block, uint8_t* buf);
+int book_init(void);
 int fetch_page(const uint32_t addr);
+void update_chapter_progress(uint32_t offset);
 void flip_page(int backwards);
+void goto_page(uint32_t addr);
 
 #endif // PAGE_H

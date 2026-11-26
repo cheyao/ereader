@@ -17,6 +17,25 @@ typedef struct Line {
 static Line lines[HEIGHT / LINE_HEIGHT + 1];
 uint32_t render_advance;
 
+// Progress bar in the strip below the last text line
+static uint32_t progress_px;
+static uint8_t progress_on;
+// 3 px black bar (both planes), 1 px light gray track (plane 0 only)
+#define PROGRESS_BAR 0x38
+#define PROGRESS_TRACK 0x10
+
+void set_progress(uint32_t done, uint32_t total) {
+	progress_on = total != 0;
+	if (!progress_on) {
+		return;
+	}
+	if (done > total) {
+		done = total;
+	}
+	// total < 8.9 MB, so done * WIDTH fits in 32 bits
+	progress_px = done * WIDTH / total;
+}
+
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 
 void prepare_text(const char* text) {
@@ -38,7 +57,7 @@ void prepare_text(const char* text) {
 
 	for (; text[i] != 0; ++i) {
 		char c = text[i];
-		if (c < '!' || c > '~') {
+		if (c < 0x1F || c > '~') {
 			c = '?';
 		}
 
@@ -47,9 +66,9 @@ void prepare_text(const char* text) {
 			break;
 		}
 
-		const uintptr_t glyph_offset = offset_table[c - '!'];
+		const uintptr_t glyph_offset = offset_table[c - 0x1f];
 		const uint8_t glyph_advance =
-				text[i] == ' ' ? SPACE_ADVANCE : font_table[glyph_offset + 3];
+				font_table[glyph_offset + 3];
 
 		if (text[i] == '\n' || (line_advance + glyph_advance) > WIDTH) {
 			if (text[i] != '\n' && text[i] != ' ') {
@@ -83,7 +102,7 @@ void prepare_text(const char* text) {
 		}
 
 		lines[line].remaining += 1;
-		line_advance += text[i] == ' ' ? SPACE_ADVANCE : glyph_advance;
+		line_advance += glyph_advance;
 	}
 
 	if (line >= HEIGHT / LINE_HEIGHT + 1) {
@@ -130,7 +149,14 @@ void render_text_partial(const char* text, const uint8_t buffer) {
 			const int line_num = y / (LINE_HEIGHT / 8);
 
 			if (line_num >= HEIGHT / LINE_HEIGHT) {
-				send(0x00);
+				// Bottom strip: chapter progress bar
+				if (!progress_on) {
+					send(0x00);
+				} else if ((uint32_t)x < progress_px) {
+					send(PROGRESS_BAR);
+				} else {
+					send(buffer == 0 ? PROGRESS_TRACK : 0x00);
+				}
 				continue;
 			}
 
@@ -154,12 +180,12 @@ void render_text_partial(const char* text, const uint8_t buffer) {
 			}
 
 			char c = text[line->index];
-			if (c < '!' || c > '~') {
+			if (c < 0x1f || c > '~') {
 				c = '?';
 			}
 
 			// Glyph proprieties
-			const uintptr_t glyph_offset = offset_table[c - '!'];
+			const uintptr_t glyph_offset = offset_table[c - 0x1f];
 			const uint8_t w = font_table[glyph_offset],
 						  h = font_table[glyph_offset + 1];
 			const uint8_t xoff = font_table[glyph_offset + 2];

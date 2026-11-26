@@ -261,8 +261,64 @@ int sd_read_block(uint32_t block, uint8_t* buf) {
 	return 0;
 }
 
+// Book layout from the card header written by sdcard/flash.sh. Without a
+// header the text starts at block 0 and there is no chapter progress bar.
+#define MAX_CHAPTERS 512
+
+static uint32_t book_block; // First card block of the book text
+static uint32_t book_len;
+static uint32_t chapters[MAX_CHAPTERS]; // Chapter start offsets, ascending
+static uint32_t chapter_count;
+
+static uint32_t le32(const uint8_t* p) {
+	return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) |
+		   ((uint32_t)p[3] << 24);
+}
+
+int book_init(void) {
+	// Borrow the page buffer, fetch_page() overwrites it afterwards
+	uint8_t* const buf = (uint8_t*)page;
+	if (sd_read_block(0, buf) != 0) {
+		return -1;
+	}
+
+	book_block = 0;
+	book_len = 0;
+	chapter_count = 0;
+	if (buf[0] != 'E' || buf[1] != 'B' || buf[2] != 'K' || buf[3] != '1') {
+		printf("No book header\n");
+		return 0;
+	}
+
+	book_block = le32(buf + 4);
+	book_len = le32(buf + 8);
+	const uint32_t count = le32(buf + 12);
+	if (count > MAX_CHAPTERS) {
+		printf("Too many chapters (%lu), no progress bar\n", count);
+	} else {
+		// Table starts at byte 16 and may run into the next header blocks
+		uint32_t loaded_block = 0;
+		for (uint32_t k = 0; k < count; ++k) {
+			const uint32_t pos = 16 + 4 * k;
+			if (pos / 512 != loaded_block) {
+				loaded_block = pos / 512;
+				if (sd_read_block(loaded_block, buf) != 0) {
+					return -1;
+				}
+			}
+			// Offsets are 4-byte aligned, so never straddle a block
+			chapters[k] = le32(buf + pos % 512);
+		}
+		chapter_count = count;
+	}
+
+	printf("Book: %lu bytes from block %lu, %lu chapters\n", book_len,
+		   book_block, chapter_count);
+	return 0;
+}
+
 int fetch_page(const uint32_t addr) {
-	const uint32_t first = addr / 512;
+	const uint32_t first = book_block + addr / 512;
 	const uint32_t skip = addr % 512;
 
 	for (int i = 0; i < MAX_PAGE_SIZE / 512; ++i) {
@@ -296,6 +352,56 @@ int fetch_page(const uint32_t addr) {
 	return 0;
 }
 
+// Sets the progress bar for the page at offset, laid out by prepare_text()
+// (needs render_advance). Chapter = from its start offset up to the next
+// chapter's start, or the end of the book.
+void update_chapter_progress(uint32_t offset) {
+	if (chapter_count == 0) {
+		set_progress(0, 0);
+		return;
+	}
+
+	// Last chapter starting at or before offset (binary search)
+	uint32_t lo = 0, hi = chapter_count;
+	while (hi - lo > 1) {
+		const uint32_t mid = (lo + hi) / 2;
+		if (chapters[mid] <= offset) {
+			lo = mid;
+		} else {
+			hi = mid;
+		}
+	}
+
+	const uint32_t start = chapters[lo];
+	const uint32_t end = lo + 1 < chapter_count ? chapters[lo + 1] : book_len;
+	set_progress(offset + render_advance - start, end - start);
+}
+
+static void show_page(uint32_t next, uint32_t start);
+
+static void push_history(uint32_t offset) {
+	history[history_pos] = offset;
+	history_pos = (history_pos + 1) % HISTORY_LEN;
+	if (history_len < HISTORY_LEN) {
+		++history_len;
+	}
+}
+
+void goto_page(uint32_t addr) {
+	uint32_t start = funSysTick32();
+
+	const uint32_t cur = read_last_page();
+	if (addr == cur) {
+		return;
+	}
+	if (fetch_page(addr) != 0) {
+		return;
+	}
+	// Remember where we were so flipping back undoes the jump
+	push_history(cur);
+	show_page(addr, start);
+}
+
 void flip_page(int backwards) {
 	uint32_t start = funSysTick32();
 
@@ -324,12 +430,13 @@ void flip_page(int backwards) {
 			--history_len;
 		}
 	} else {
-		history[history_pos] = cur;
-		history_pos = (history_pos + 1) % HISTORY_LEN;
-		if (history_len < HISTORY_LEN) {
-			++history_len;
-		}
+		push_history(cur);
 	}
+	show_page(next, start);
+}
+
+// Saves next as the current page and draws it (page already fetched)
+static void show_page(uint32_t next, uint32_t start) {
 	write_last_page(next);
 
 	// Do this even when we do full refresh to balance bw
@@ -339,6 +446,7 @@ void flip_page(int backwards) {
 	const uint32_t clear_start = funSysTick32();
 	refresh_no_wait();
 	prepare_text(page + 512);
+	update_chapter_progress(next);
 	wait_busy();
 	const uint32_t clear_end = funSysTick32();
 	printf("Refreshed: %ld\n", clear_end - clear_start);
